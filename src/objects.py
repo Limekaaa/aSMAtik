@@ -6,7 +6,7 @@ from mesa import Agent
 import random
 
 
-class Radioactivity(Agent):
+class RadioactivityAgent(Agent):
     """
     Agent representing the radioactivity level of a cell.
     """
@@ -24,7 +24,7 @@ class Radioactivity(Agent):
             self.level = random.uniform(0.66, 1)
 
 
-class WasteDisposalZone(Agent):
+class WasteDisposalZoneAgent(Agent):
     """
     Agent representing the waste disposal zone.
     This is a specific cell located in the eastern part of the grid.
@@ -36,7 +36,7 @@ class WasteDisposalZone(Agent):
         self.type = "disposal_zone"
 
 
-class Waste(Agent):
+class WasteAgent(Agent):
     """
     Agent representing a waste object.
     """
