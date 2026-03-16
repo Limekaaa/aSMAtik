@@ -8,6 +8,9 @@ from mesa import Model, Agent
 from mesa.time import RandomActivation
 from mesa.space import MultiGrid
 from mesa.datacollection import DataCollector
+from objects import RadioactivityAgent
+from objects import WasteDisposalZoneAgent
+from objects import WasteAgent
 
 
 class RobotMission(Model):
@@ -77,12 +80,9 @@ class RobotMission(Model):
         # Create radioactivity agents for each zone (one per cell)
         for x in range(self.width):
             for y in range(self.height):
-                zone = self._get_zone(x)
-                radioactivity_level = self._calculate_radioactivity(zone)
+                zone = self._get_zone(x)                
                 
-                # Import here to avoid circular imports
-                from objects import RadioactivityAgent
-                radioactivity = RadioactivityAgent(self, zone, radioactivity_level)
+                radioactivity = RadioactivityAgent(self, zone)
                 self.grid.place_agent(radioactivity, (x, y))
                 self.radioactivity_agents.append(radioactivity)
         
@@ -91,7 +91,7 @@ class RobotMission(Model):
         disposal_x = random.randint(z3_start, z3_end - 1)
         disposal_y = random.randint(0, self.height - 1)
         
-        from objects import WasteDisposalZoneAgent
+        
         self.waste_disposal_zone = WasteDisposalZoneAgent(self)
         self.grid.place_agent(self.waste_disposal_zone, (disposal_x, disposal_y))
         
@@ -101,7 +101,7 @@ class RobotMission(Model):
             x = random.randint(z1_start, z1_end - 1)
             y = random.randint(0, self.height - 1)
             
-            from objects import WasteAgent
+            
             waste = WasteAgent(self, waste_type='green')
             self.grid.place_agent(waste, (x, y))
             self.waste_pieces.append(waste)
@@ -139,6 +139,14 @@ class RobotMission(Model):
             self.schedule.add(robot)
             self.robots.append(robot)
     
+    def place_agent(self, agent, pos):
+        """Place an agent on the grid and add to scheduler if it's a robot."""
+        self.grid.place_agent(agent, pos)
+        if hasattr(agent, 'robot'):
+            self.schedule.add(agent)
+        
+
+
     def _get_zone(self, x):
         """Determine which zone a position belongs to based on x-coordinate."""
         if x < self.zone_boundaries['z1'][1]:

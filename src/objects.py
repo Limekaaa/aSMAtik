@@ -11,8 +11,8 @@ class Radioactivity(Agent):
     Agent representing the radioactivity level of a cell.
     """
 
-    def __init__(self, unique_id, model, zone):
-        super().__init__(unique_id, model)
+    def __init__(self, zone):
+        super().__init__()
 
         self.zone = zone  # z1, z2 or z3
 
@@ -30,8 +30,8 @@ class WasteDisposalZone(Agent):
     This is a specific cell located in the eastern part of the grid.
     """
 
-    def __init__(self, unique_id, model):
-        super().__init__(unique_id, model)
+    def __init__(self):
+        super().__init__()
 
         self.type = "disposal_zone"
 
@@ -41,7 +41,7 @@ class Waste(Agent):
     Agent representing a waste object.
     """
 
-    def __init__(self, unique_id, model, waste_type):
-        super().__init__(unique_id, model)
+    def __init__(self, waste_type):
+        super().__init__()
 
         self.waste_type = waste_type
