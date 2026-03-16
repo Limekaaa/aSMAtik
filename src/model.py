@@ -148,15 +148,6 @@ class RobotMission(Model):
         else:
             return 'z3'
     
-    def _calculate_radioactivity(self, zone):
-        """Calculate random radioactivity level based on zone."""
-        if zone == 'z1':
-            return random.uniform(0, 0.33)
-        elif zone == 'z2':
-            return random.uniform(0.33, 0.66)
-        else:  # z3
-            return random.uniform(0.66, 1.0)
-    
     def do(self, agent, action):
         """
         Execute an agent's action and return updated percepts.
