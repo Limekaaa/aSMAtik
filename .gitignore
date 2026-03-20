@@ -1,0 +1,68 @@
+# Virtual Environment
+venv/
+env/
+ENV/
+.venv
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+*.whl
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Simulation outputs
+simulation_data.csv
+simulation_analysis.png
+*.csv
+*.png
+
+# OS
+.DS_Store
+.AppleDouble
+.LSOverride
+*.swp
+*.swo
+
+# Temporary files
+*.tmp
+*.bak
+*.log
+
+# Distribution
+*.egg-info
+dist
+build
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# IDE and editor files
+.sublime-*
+*.sublime-workspace
+*.sublime-project

@@ -2,43 +2,47 @@
 # Created 16-03-2026
 # Quentin GUIGNARD, Maxime HANUS, Thomas PEDENAUD
 
-import mesa
-from mesa.datacollection import DataCollector
+import random
 from mesa import Agent
 
 
 class RobotAgent(Agent):
-    def __init__(self, model, policy_name:str, **kwargs):
-        super().__init__(model)
+    def __init__(self, model, policy_name: str, **kwargs):
+        # Generate unique id for the robot
+        unique_id = f"robot_{random.randint(0, 999999)}"
+        super().__init__(unique_id, model)
+        
         self.model = model
         self.knowledge = {}
-        self.actions = ["left", "right", "up", "down", "pick", "drop", "transform"]
-        self.inventory = {}
-
-        policy_import = __import__("policies." + policy_name, fromlist="Policy")
-
-        policy = policy_import.Policy(self.model, self.actions, **kwargs)
-
+        self.inventory = []
+        self.robot_type = None
+        self.max_inventory = 0
+        self.disposed_waste_count = 0
+        
+        # Load policy with available actions
+        available_actions = ['move', 'pick_up', 'transform', 'put_down', 'dispose']
+        policy_module = __import__("policies." + policy_name, fromlist="Policy")
+        policy = policy_module.Policy(self.model, available_actions, **kwargs)
         self.deliberate = policy.deliberate
 
-    def update(self, percepts:dict):
+    def update(self, percepts: dict):
         self.knowledge.update(percepts)
 
     def can_access_zone(self, zone):
         pass
 
-    
     def can_pick_up_type(self, waste_type):
         pass
 
-    def step_agent (self):
+    def step(self):
+        """Mesa step method."""
         action = self.deliberate(self.knowledge)
         percepts = self.model.do(self, action)
         self.knowledge.update(percepts)
 
 
 class GreenRobot(RobotAgent):
-    def __init__(self, model, policy_name:str, **kwargs):
+    def __init__(self, model, policy_name: str, **kwargs):
         super().__init__(model, policy_name, **kwargs)
 
     def can_access_zone(self, zone):
@@ -53,7 +57,7 @@ class GreenRobot(RobotAgent):
 
 
 class YellowRobot(RobotAgent):
-    def __init__(self, model, policy_name:str, **kwargs):
+    def __init__(self, model, policy_name: str, **kwargs):
         super().__init__(model, policy_name, **kwargs)
 
     def can_access_zone(self, zone):
@@ -67,7 +71,7 @@ class YellowRobot(RobotAgent):
         return False
 
 class RedRobot(RobotAgent):
-    def __init__(self, model, policy_name:str, **kwargs):
+    def __init__(self, model, policy_name: str, **kwargs):
         super().__init__(model, policy_name, **kwargs)
 
     def can_access_zone(self, zone):
