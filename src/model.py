@@ -8,9 +8,6 @@ from mesa import Model, Agent
 from mesa.time import RandomActivation
 from mesa.space import MultiGrid
 from mesa.datacollection import DataCollector
-from objects import RadioactivityAgent
-from objects import WasteDisposalZoneAgent
-from objects import WasteAgent
 
 
 class RobotMission(Model):
@@ -80,9 +77,13 @@ class RobotMission(Model):
         # Create radioactivity agents for each zone (one per cell)
         for x in range(self.width):
             for y in range(self.height):
-                zone = self._get_zone(x)                
+                zone = self._get_zone(x)
+                radioactivity_level = self._calculate_radioactivity(zone)
                 
-                radioactivity = RadioactivityAgent(self, zone)
+                # Import here to avoid circular imports
+                from .objects import RadioactivityAgent
+                radioactivity = RadioactivityAgent(zone, model=self)
+                radioactivity.radioactivity_level = radioactivity_level
                 self.grid.place_agent(radioactivity, (x, y))
                 self.radioactivity_agents.append(radioactivity)
         
@@ -91,8 +92,8 @@ class RobotMission(Model):
         disposal_x = random.randint(z3_start, z3_end - 1)
         disposal_y = random.randint(0, self.height - 1)
         
-        
-        self.waste_disposal_zone = WasteDisposalZoneAgent(self)
+        from .objects import WasteDisposalZoneAgent
+        self.waste_disposal_zone = WasteDisposalZoneAgent(model=self)
         self.grid.place_agent(self.waste_disposal_zone, (disposal_x, disposal_y))
         
         # Create initial green waste in z1
@@ -101,18 +102,22 @@ class RobotMission(Model):
             x = random.randint(z1_start, z1_end - 1)
             y = random.randint(0, self.height - 1)
             
-            
-            waste = WasteAgent(self, waste_type='green')
+            from .objects import WasteAgent
+            waste = WasteAgent('green', model=self)
             self.grid.place_agent(waste, (x, y))
             self.waste_pieces.append(waste)
     
     def _initialize_agents(self):
         """Initialize robot agents."""
-        from agents import GreenRobot, YellowRobot, RedRobot
+        from .agents import GreenRobot, YellowRobot, RedRobot
         
         # Place green robots
         for i in range(self.num_green_robots):
-            robot = GreenRobot(self)
+            robot = GreenRobot(self, "random_policy")
+            robot.robot_type = 'green'
+            robot.max_inventory = 2
+            robot.inventory = []
+            robot.disposed_waste_count = 0
             z1_start, z1_end = self.zone_boundaries['z1']
             x = random.randint(z1_start, z1_end - 1)
             y = random.randint(0, self.height - 1)
@@ -122,8 +127,12 @@ class RobotMission(Model):
         
         # Place yellow robots
         for i in range(self.num_yellow_robots):
-            robot = YellowRobot(self)
-            z1_start, z2_end = self.zone_boundaries['z2'][1]
+            robot = YellowRobot(self, "random_policy")
+            robot.robot_type = 'yellow'
+            robot.max_inventory = 2
+            robot.inventory = []
+            robot.disposed_waste_count = 0
+            z2_end = self.zone_boundaries['z2'][1]
             x = random.randint(0, z2_end - 1)
             y = random.randint(0, self.height - 1)
             self.grid.place_agent(robot, (x, y))
@@ -132,21 +141,17 @@ class RobotMission(Model):
         
         # Place red robots
         for i in range(self.num_red_robots):
-            robot = RedRobot(self)
+            robot = RedRobot(self, "random_policy")
+            robot.robot_type = 'red'
+            robot.max_inventory = 1
+            robot.inventory = []
+            robot.disposed_waste_count = 0
             x = random.randint(0, self.width - 1)
             y = random.randint(0, self.height - 1)
             self.grid.place_agent(robot, (x, y))
             self.schedule.add(robot)
             self.robots.append(robot)
     
-    def place_agent(self, agent, pos):
-        """Place an agent on the grid and add to scheduler if it's a robot."""
-        self.grid.place_agent(agent, pos)
-        if hasattr(agent, 'robot'):
-            self.schedule.add(agent)
-        
-
-
     def _get_zone(self, x):
         """Determine which zone a position belongs to based on x-coordinate."""
         if x < self.zone_boundaries['z1'][1]:
@@ -155,6 +160,16 @@ class RobotMission(Model):
             return 'z2'
         else:
             return 'z3'
+    
+    def _calculate_radioactivity(self, zone):
+        """Calculate random radioactivity level based on zone."""
+        if zone == 'z1':
+            return random.uniform(0, 0.33)
+        elif zone == 'z2':
+            return random.uniform(0.33, 0.66)
+        else:  # z3
+            return random.uniform(0.66, 1.0)
+    
     
     def do(self, agent, action):
         """
@@ -251,8 +266,8 @@ class RobotMission(Model):
             waste_type = agent.inventory.pop()
             
             # Create new waste agent
-            from objects import WasteAgent
-            waste = WasteAgent(self, waste_type=waste_type)
+            from .objects import WasteAgent
+            waste = WasteAgent(waste_type, model=self)
             self.grid.place_agent(waste, agent.pos)
             self.waste_pieces.append(waste)
     
