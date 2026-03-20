@@ -120,7 +120,7 @@ def DisposalChart(model: RobotMission, step: int = 0):
 
 
 @solara.component
-def Statistics(model: RobotMission):
+def Statistics(model: RobotMission, step: int = 0):
     """Component to display simulation statistics."""
     data = model.datacollector.get_model_vars_dataframe()
     
@@ -130,12 +130,12 @@ def Statistics(model: RobotMission):
         green = int(data['Green Waste'].iloc[-1])
         yellow = int(data['Yellow Waste'].iloc[-1])
         red = int(data['Red Waste'].iloc[-1])
-        step = len(data) - 1
+        current_step = len(data) - 1
         
         solara.Markdown(f"""
 ### Simulation Statistics
 
-**Current Step:** {step}
+**Current Step:** {current_step}
 
 **Waste in Environment:**
 - Green: {green}
