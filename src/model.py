@@ -138,8 +138,8 @@ class RobotMission(Model):
             robot.max_inventory = 2
             robot.inventory = []
             robot.disposed_waste_count = 0
-            z2_end = self.zone_boundaries['z2'][1]
-            x = random.randint(0, z2_end - 1)
+            z2_start, z2_end = self.zone_boundaries['z2']
+            x = random.randint(z2_start, z2_end - 1)
             y = random.randint(0, self.height - 1)
             self.grid.place_agent(robot, (x, y))
             self.schedule.add(robot)
@@ -152,7 +152,8 @@ class RobotMission(Model):
             robot.max_inventory = 1
             robot.inventory = []
             robot.disposed_waste_count = 0
-            x = random.randint(0, self.width - 1)
+            z3_start, z3_end = self.zone_boundaries['z3']
+            x = random.randint(z3_start, z3_end - 1)
             y = random.randint(0, self.height - 1)
             self.grid.place_agent(robot, (x, y))
             self.schedule.add(robot)
