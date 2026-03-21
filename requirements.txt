@@ -3,7 +3,7 @@
 # Robot Mission MAS - Complete Dependencies
 
 # Core simulation framework
-mesa==2.4.0
+mesa==3.0.0
 mesa-examples==0.1.0
 
 # Data processing and analysis
