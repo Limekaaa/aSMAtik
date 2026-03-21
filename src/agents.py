@@ -11,7 +11,9 @@ class RobotAgent(Agent):
         super().__init__(model)
         
         self.model = model
-        self.knowledge = {}
+        self.knowledge = {
+            "visited": set()
+        }
         self.inventory = []
         self.robot_type = None
         self.max_inventory = 0
@@ -34,6 +36,8 @@ class RobotAgent(Agent):
 
     def step(self):
         """Mesa step method."""
+        self.knowledge["visited"].add(self.pos)
+        
         action = self.deliberate(self, self.knowledge)
         percepts = self.model.do(self, action)
         self.knowledge.update(percepts)

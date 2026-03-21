@@ -3,6 +3,7 @@
 # Quentin GUIGNARD, Maxime HANUS, Thomas PEDENAUD
 
 import random
+from policies.utils import waste_here, get_accessible_neighbors
 
 class Policy:
     def __init__(self, model, available_actions, **kwargs):
@@ -12,7 +13,7 @@ class Policy:
     def deliberate(self, agent, knowledge):
         """
         Decide the next action based on the robot type and percepts.
-        knowledge: dict with 'position', 'zone', 'inventory', 'adjacent_cells'
+        knowledge: dict with 'position', 'zone', 'inventory'
         """
 
         # Meeting checkpoints
@@ -24,11 +25,6 @@ class Policy:
         inv = agent.inventory
         pos = agent.pos
         zone = self.model._get_zone(pos[0])
-
-        # UTIL: check if waste of type wtype is present in current cell
-        def waste_here(wtype):
-            cell_contents = self.model.grid.get_cell_list_contents([pos])
-            return any(hasattr(obj, "waste_type") and obj.waste_type == wtype for obj in cell_contents)
 
         # --- GREEN ROBOTS ---
         if agent.robot_type == "green":
@@ -46,12 +42,20 @@ class Policy:
                     return {"type": "move", "direction": (dx, dy)}
 
             # Pick green
-            if waste_here("green"):
+            if waste_here(self.model, pos, "green"):
                 return {"type": "pick_up"}
 
-            # Otherwise explore
-            directions = [(-1,0),(1,0),(0,-1),(0,1)]
-            return {"type": "move", "direction": random.choice(directions)}
+            # Otherwise explore by prioritizing unvisited neighbors
+            neighbors = get_accessible_neighbors(self.model, agent, pos)
+            visited = knowledge.get("visited", set())
+
+            unvisited = [n for n in neighbors if n[0] not in visited]
+
+            if unvisited:
+                _, direction = random.choice(unvisited)
+                return {"type": "move", "direction": direction}
+
+            return {"type": "move", "direction": random.choice(neighbors)[1]}
 
         # --- YELLOW ROBOTS ---
         if agent.robot_type == "yellow":
@@ -69,7 +73,7 @@ class Policy:
                     return {"type": "move", "direction": (dx, dy)}
 
             # Pick yellow or green
-            if waste_here("yellow") or waste_here("green"):
+            if waste_here(self.model, pos, "yellow") or waste_here(self.model, pos, "green"):
                 return {"type": "pick_up"}
 
             # Otherwise wait at the checkpoint z1/z2
@@ -91,7 +95,7 @@ class Policy:
                     return {"type": "move", "direction": (dx, dy)}
 
             # Pick red or yellow or green
-            if waste_here("red") or waste_here("yellow") or waste_here("green"):
+            if waste_here(self.model, pos, "red") or waste_here(self.model, pos, "yellow") or waste_here(self.model, pos, "green"):
                 return {"type": "pick_up"}
 
             # Otherwise wait at the checkpoint z2/z3
