@@ -34,7 +34,7 @@ class RobotAgent(Agent):
 
     def step(self):
         """Mesa step method."""
-        action = self.deliberate(self.knowledge)
+        action = self.deliberate(self, self.knowledge)
         percepts = self.model.do(self, action)
         self.knowledge.update(percepts)
 
