@@ -1,3 +1,7 @@
+# Group 11
+# Created 16-03-2026
+# Quentin GUIGNARD, Maxime HANUS, Thomas PEDENAUD
+
 import random
 
 

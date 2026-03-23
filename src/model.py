@@ -46,6 +46,10 @@ class RobotMission(Model):
             'z2': (width // 3, 2 * width // 3),
             'z3': (2 * width // 3, width)
         }
+
+        # Meeting checkpoints (borders between zones)
+        self.z1_z2_border = (self.zone_boundaries['z1'][1] - 1, self.height // 2)
+        self.z2_z3_border = (self.zone_boundaries['z2'][1] - 1, self.height // 2)
         
         # Initialize grid and scheduler
         self.grid = MultiGrid(width, height, torus=False)
@@ -110,10 +114,12 @@ class RobotMission(Model):
     def _initialize_agents(self):
         """Initialize robot agents."""
         from .agents import GreenRobot, YellowRobot, RedRobot
+
+        policy_name = 'baseline_policy'
         
         # Place green robots
         for i in range(self.num_green_robots):
-            robot = GreenRobot(self, "random_policy")
+            robot = GreenRobot(self, policy_name)
             robot.robot_type = 'green'
             robot.max_inventory = 2
             robot.inventory = []
@@ -127,13 +133,13 @@ class RobotMission(Model):
         
         # Place yellow robots
         for i in range(self.num_yellow_robots):
-            robot = YellowRobot(self, "random_policy")
+            robot = YellowRobot(self, policy_name)
             robot.robot_type = 'yellow'
             robot.max_inventory = 2
             robot.inventory = []
             robot.disposed_waste_count = 0
-            z2_end = self.zone_boundaries['z2'][1]
-            x = random.randint(0, z2_end - 1)
+            z2_start, z2_end = self.zone_boundaries['z2']
+            x = random.randint(z2_start, z2_end - 1)
             y = random.randint(0, self.height - 1)
             self.grid.place_agent(robot, (x, y))
             self.schedule.add(robot)
@@ -141,12 +147,13 @@ class RobotMission(Model):
         
         # Place red robots
         for i in range(self.num_red_robots):
-            robot = RedRobot(self, "random_policy")
+            robot = RedRobot(self, policy_name)
             robot.robot_type = 'red'
             robot.max_inventory = 1
             robot.inventory = []
             robot.disposed_waste_count = 0
-            x = random.randint(0, self.width - 1)
+            z3_start, z3_end = self.zone_boundaries['z3']
+            x = random.randint(z3_start, z3_end - 1)
             y = random.randint(0, self.height - 1)
             self.grid.place_agent(robot, (x, y))
             self.schedule.add(robot)
