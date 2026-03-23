@@ -259,15 +259,15 @@ class RobotMission(Model):
         
         # Yellow robot: 2 yellow -> 1 red
         elif agent.robot_type == 'yellow':
-            if agent.inventory.count('yellow') >= 2:
-                agent.inventory.remove('yellow')
-                agent.inventory.remove('yellow')
-                agent.inventory.append('red')
-
             if agent.inventory.count('green') >= 2:
                 agent.inventory.remove('green')
                 agent.inventory.remove('green')
                 agent.inventory.append('yellow')
+
+            if agent.inventory.count('yellow') >= 2:
+                agent.inventory.remove('yellow')
+                agent.inventory.remove('yellow')
+                agent.inventory.append('red')
         
         # Red robot: doesn't transform, only transports
         # No action needed here
