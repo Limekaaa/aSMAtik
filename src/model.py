@@ -263,6 +263,11 @@ class RobotMission(Model):
                 agent.inventory.remove('yellow')
                 agent.inventory.remove('yellow')
                 agent.inventory.append('red')
+
+            if agent.inventory.count('green') >= 2:
+                agent.inventory.remove('green')
+                agent.inventory.remove('green')
+                agent.inventory.append('yellow')
         
         # Red robot: doesn't transform, only transports
         # No action needed here
