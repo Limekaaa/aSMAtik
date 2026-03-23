@@ -4,6 +4,7 @@
 
 import random
 from mesa import Agent
+from policies.utils import waste_here
 
 
 class RobotAgent(Agent):
@@ -11,9 +12,7 @@ class RobotAgent(Agent):
         super().__init__(model)
         
         self.model = model
-        self.knowledge = {
-            "visited": set()
-        }
+        self.knowledge = {}
         self.inventory = []
         self.robot_type = None
         self.max_inventory = 0
@@ -37,7 +36,6 @@ class RobotAgent(Agent):
 
     def step(self):
         """Mesa step method."""
-        self.knowledge["visited"].add(self.pos)
         
         action = self.deliberate(self, self.knowledge)
         self.last_action = action  # Store action for visualization

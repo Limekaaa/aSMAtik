@@ -116,10 +116,11 @@ class RobotMission(Model):
         from .agents import GreenRobot, YellowRobot, RedRobot
 
         policy_name = 'baseline_policy'
+        kwargs = {"holding_threshold": 10}
         
         # Place green robots
         for i in range(self.num_green_robots):
-            robot = GreenRobot(self, policy_name)
+            robot = GreenRobot(self, policy_name, **kwargs)
             robot.robot_type = 'green'
             robot.max_inventory = 2
             robot.inventory = []
@@ -133,7 +134,7 @@ class RobotMission(Model):
         
         # Place yellow robots
         for i in range(self.num_yellow_robots):
-            robot = YellowRobot(self, policy_name)
+            robot = YellowRobot(self, policy_name, **kwargs)
             robot.robot_type = 'yellow'
             robot.max_inventory = 2
             robot.inventory = []
@@ -147,7 +148,7 @@ class RobotMission(Model):
         
         # Place red robots
         for i in range(self.num_red_robots):
-            robot = RedRobot(self, policy_name)
+            robot = RedRobot(self, policy_name, **kwargs)
             robot.robot_type = 'red'
             robot.max_inventory = 1
             robot.inventory = []
@@ -259,6 +260,11 @@ class RobotMission(Model):
         
         # Yellow robot: 2 yellow -> 1 red
         elif agent.robot_type == 'yellow':
+            if agent.inventory.count('green') >= 2:
+                agent.inventory.remove('green')
+                agent.inventory.remove('green')
+                agent.inventory.append('yellow')
+
             if agent.inventory.count('yellow') >= 2:
                 agent.inventory.remove('yellow')
                 agent.inventory.remove('yellow')
@@ -283,6 +289,12 @@ class RobotMission(Model):
         if agent.pos == self.waste_disposal_zone.pos and agent.inventory:
             if 'red' in agent.inventory:
                 agent.inventory.remove('red')
+                agent.disposed_waste_count += 4
+            elif 'yellow' in agent.inventory:
+                agent.inventory.remove('yellow')
+                agent.disposed_waste_count += 2
+            elif 'green' in agent.inventory:
+                agent.inventory.remove('green')
                 agent.disposed_waste_count += 1
     
     def _get_percepts(self, agent):
