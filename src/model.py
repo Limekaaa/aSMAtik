@@ -116,10 +116,11 @@ class RobotMission(Model):
         from .agents import GreenRobot, YellowRobot, RedRobot
 
         policy_name = 'baseline_policy'
+        kwargs = {"holding_threshold": 10}
         
         # Place green robots
         for i in range(self.num_green_robots):
-            robot = GreenRobot(self, policy_name)
+            robot = GreenRobot(self, policy_name, **kwargs)
             robot.robot_type = 'green'
             robot.max_inventory = 2
             robot.inventory = []
@@ -133,7 +134,7 @@ class RobotMission(Model):
         
         # Place yellow robots
         for i in range(self.num_yellow_robots):
-            robot = YellowRobot(self, policy_name)
+            robot = YellowRobot(self, policy_name, **kwargs)
             robot.robot_type = 'yellow'
             robot.max_inventory = 2
             robot.inventory = []
@@ -147,7 +148,7 @@ class RobotMission(Model):
         
         # Place red robots
         for i in range(self.num_red_robots):
-            robot = RedRobot(self, policy_name)
+            robot = RedRobot(self, policy_name, **kwargs)
             robot.robot_type = 'red'
             robot.max_inventory = 1
             robot.inventory = []

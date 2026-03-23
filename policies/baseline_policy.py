@@ -11,12 +11,37 @@ class Policy:
     def __init__(self, model, available_actions, **kwargs):
         self.model = model
         self.available_actions = available_actions
+        self.holding_threshold = kwargs.get("holding_threshold", HOLDING_THRESHOLD)
+        self.is_first_step = True
 
-    def deliberate(self, agent, knowledge):
+    def deliberate(self, agent):
         """
         Decide the next action based on the robot type and percepts.
         knowledge: dict with 'position', 'zone', 'inventory'
         """
+
+        if self.is_first_step:
+            agent.knowledge["visited"] = set()
+            agent.knowledge["untaken_waste"] = set()
+            agent.knowledge["holding_steps"] = 0
+            agent.knowledge["adjacent_cells"] = {}
+            self.is_first_step = False
+
+        agent.knowledge["visited"].add(agent.pos)
+
+        if agent.pos in agent.knowledge["untaken_waste"] and not waste_here(self.model, agent.pos, "green"):
+            agent.knowledge["untaken_waste"].remove(agent.pos)
+
+        for cell in agent.knowledge.get("adjacent_cells", {}).values():
+            if "green" in cell["waste"]:
+                agent.knowledge["untaken_waste"].add(cell["position"])
+
+        if agent.inventory:
+            agent.knowledge["holding_steps"] += 1
+        else:
+            agent.knowledge["holding_steps"] = 0
+
+        knowledge = agent.knowledge
 
         # Meeting checkpoints
         z1_z2 = self.model.z1_z2_border
@@ -103,7 +128,7 @@ class Policy:
                 return {"type": "pick_up"}
             
             # If holding waste for too long, go to checkpoint to put it down
-            if inv and knowledge.get("holding_steps", 0) > HOLDING_THRESHOLD:
+            if inv and knowledge.get("holding_steps", 0) > self.holding_threshold:
                 if pos == z2_z3:
                     return {"type": "put_down"}
                 else:

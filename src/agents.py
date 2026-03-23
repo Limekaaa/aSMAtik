@@ -12,12 +12,7 @@ class RobotAgent(Agent):
         super().__init__(model)
         
         self.model = model
-        self.knowledge = {
-            "visited": set(),
-            "untaken_waste": set(),
-            "holding_steps": 0,
-            "adjacent_cells": {}
-        }
+        self.knowledge = {}
         self.inventory = []
         self.robot_type = None
         self.max_inventory = 0
@@ -40,21 +35,8 @@ class RobotAgent(Agent):
 
     def step(self):
         """Mesa step method."""
-        self.knowledge["visited"].add(self.pos)
-
-        if self.pos in self.knowledge["untaken_waste"] and not waste_here(self.model, self.pos, "green"):
-            self.knowledge["untaken_waste"].remove(self.pos)
-
-        for cell in self.knowledge.get("adjacent_cells", {}).values():
-            if "green" in cell["waste"]:
-                self.knowledge["untaken_waste"].add(cell["position"])
-
-        if self.inventory:
-            self.knowledge["holding_steps"] += 1
-        else:
-            self.knowledge["holding_steps"] = 0
         
-        action = self.deliberate(self, self.knowledge)
+        action = self.deliberate(self)
         percepts = self.model.do(self, action)
         self.knowledge.update(percepts)
 
