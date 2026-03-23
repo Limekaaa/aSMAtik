@@ -17,6 +17,7 @@ class RobotAgent(Agent):
         self.robot_type = None
         self.max_inventory = 0
         self.disposed_waste_count = 0
+        self.last_action = {}  # Store last action for visualization
         
         # Load policy with available actions
         available_actions = ['move', 'pick_up', 'transform', 'put_down', 'dispose']
@@ -36,8 +37,9 @@ class RobotAgent(Agent):
     def step(self):
         """Mesa step method."""
         
-        action = self.deliberate(self)
-        percepts = self.model.do(self, action)
+        action = self.deliberate(self, self.knowledge)
+        self.last_action = action  # Store action for visualization
+        percepts = self.model.do(self, self.last_action)
         self.knowledge.update(percepts)
 
 
