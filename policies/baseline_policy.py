@@ -60,7 +60,7 @@ class Policy:
         # --- YELLOW ROBOTS ---
         if agent.robot_type == "yellow":
             # if 2 yellow -> transform
-            if inv.count("yellow") >= 2:
+            if inv.count("yellow") >= 2 or inv.count("green") >= 2:
                 return {"type": "transform"}
 
             # if red -> go to z2/z3 checkpoint
