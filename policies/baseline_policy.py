@@ -5,6 +5,8 @@
 import random
 from policies.utils import waste_here, get_accessible_neighbors
 
+HOLDING_THRESHOLD = 10
+
 class Policy:
     def __init__(self, model, available_actions, **kwargs):
         self.model = model
@@ -44,10 +46,34 @@ class Policy:
             # Pick green
             if waste_here(self.model, pos, "green"):
                 return {"type": "pick_up"}
+            
+            # If knows about unpicked green waste, go there
+            untaken_waste = knowledge.get("untaken_waste", set())
+            visited = knowledge.get("visited", set())
+            if len(inv) < agent.max_inventory and untaken_waste:
+                target = random.choice(list(untaken_waste))
+
+                dx = 0 if pos[0] == target[0] else (1 if target[0] > pos[0] else -1)
+                dy = 0 if pos[1] == target[1] else (1 if target[1] > pos[1] else -1)
+                return {"type": "move", "direction": (dx, dy)}
+            
+            # If has green waste but no known unpicked waste and has visited whole grid, go to checkpoint
+            z1_start, z1_end = self.model.zone_boundaries['z1']
+            z1_size = (z1_end - z1_start) * self.model.height
+            if (
+                "green" in inv
+                and not untaken_waste
+                and len(visited) >= z1_size
+            ):
+                if pos == z1_z2:
+                    return {"type": "put_down"}
+                else:
+                    dx = 0 if pos[0] == z1_z2[0] else (1 if z1_z2[0] > pos[0] else -1)
+                    dy = 0 if pos[1] == z1_z2[1] else (1 if z1_z2[1] > pos[1] else -1)
+                    return {"type": "move", "direction": (dx, dy)}
 
             # Otherwise explore by prioritizing unvisited neighbors
             neighbors = get_accessible_neighbors(self.model, agent, pos)
-            visited = knowledge.get("visited", set())
 
             unvisited = [n for n in neighbors if n[0] not in visited]
 
@@ -59,7 +85,7 @@ class Policy:
 
         # --- YELLOW ROBOTS ---
         if agent.robot_type == "yellow":
-            # if 2 yellow -> transform
+            # if 2 yellow or 2 green -> transform
             if inv.count("yellow") >= 2 or inv.count("green") >= 2:
                 return {"type": "transform"}
 
@@ -75,6 +101,15 @@ class Policy:
             # Pick yellow or green
             if waste_here(self.model, pos, "yellow") or waste_here(self.model, pos, "green"):
                 return {"type": "pick_up"}
+            
+            # If holding waste for too long, go to checkpoint to put it down
+            if inv and knowledge.get("holding_steps", 0) > HOLDING_THRESHOLD:
+                if pos == z2_z3:
+                    return {"type": "put_down"}
+                else:
+                    dx = 0 if pos[0] == z2_z3[0] else (1 if z2_z3[0] > pos[0] else -1)
+                    dy = 0 if pos[1] == z2_z3[1] else (1 if z2_z3[1] > pos[1] else -1)
+                    return {"type": "move", "direction": (dx, dy)}
 
             # Otherwise wait at the checkpoint z1/z2
             if pos != z1_z2:

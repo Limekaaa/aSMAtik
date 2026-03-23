@@ -288,6 +288,12 @@ class RobotMission(Model):
         if agent.pos == self.waste_disposal_zone.pos and agent.inventory:
             if 'red' in agent.inventory:
                 agent.inventory.remove('red')
+                agent.disposed_waste_count += 4
+            elif 'yellow' in agent.inventory:
+                agent.inventory.remove('yellow')
+                agent.disposed_waste_count += 2
+            elif 'green' in agent.inventory:
+                agent.inventory.remove('green')
                 agent.disposed_waste_count += 1
     
     def _get_percepts(self, agent):
