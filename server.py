@@ -118,7 +118,7 @@ page = SolaraViz(
     model1,
     components=[SpaceGraph, WastePlot],
     model_params=model_params,
-    name="Boltzmann Wealth Model",
+    name="aSMAtik",
 )
 # This is required to render the visualization in the Jupyter notebook
 page
