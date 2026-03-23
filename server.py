@@ -7,6 +7,7 @@ import solara
 from matplotlib.figure import Figure
 from mesa.visualization import SolaraViz, make_plot_component, make_space_component
 from mesa.visualization.utils import update_counter
+import matplotlib.pyplot as plt
 
 # Import the local model.py
 from src.model import RobotMission
@@ -18,7 +19,7 @@ def agent_portrayal(agent):
     # Robots
     if hasattr(agent, "robot_type"):
         portrayal["marker"] = "o"
-        portrayal["size"] = 40
+        portrayal["size"] = 50
         portrayal["alpha"] = 1
 
         colors = {
@@ -66,60 +67,78 @@ def agent_portrayal(agent):
 
 
 model_params = {
-    "width": 20,
-    "height": 10,
     "num_green_robots": {
         "type": "SliderInt",
-        "value": 2,
-        "min": 1,
+        "value": 1,
+        "label": "Number of green agents:",
+        "min": 0,
         "max": 10,
         "step": 1,
-        "label": "Green robots",
     },
     "num_yellow_robots": {
         "type": "SliderInt",
-        "value": 2,
-        "min": 1,
+        "value": 1,
+        "label": "Number of yellow agents:",
+        "min": 0,
         "max": 10,
         "step": 1,
-        "label": "Yellow robots",
     },
     "num_red_robots": {
         "type": "SliderInt",
         "value": 1,
-        "min": 1,
-        "max": 5,
+        "label": "Number of red agents:",
+        "min": 0,
+        "max": 10,
         "step": 1,
-        "label": "Red robots",
     },
     "num_initial_waste": {
         "type": "SliderInt",
-        "value": 15,
-        "min": 5,
-        "max": 50,
+        "value": 1,
+        "label": "Number of waste:",
+        "min": 0,
+        "max": 10,
         "step": 1,
-        "label": "Initial waste",
-    },
+    }
 }
-
-# Create initial model instance
-model1 = RobotMission()
-
+# Configuration des graphiques Mesa
 SpaceGraph = make_space_component(agent_portrayal)
-WastePlot = make_plot_component([
-    "Green Waste",
-    "Yellow Waste",
-    "Red Waste",
-    "Disposed Waste"
-])
+WastePlot = make_plot_component({
+    "Green Waste": "#00AA00",
+    "Yellow Waste": "#FFD700", 
+    "Red Waste": "#FF4444",
+    "Disposed Waste": "#888888"
+})
 
-#Create the Dashboard
+@solara.component
+def RobotStatusPanel(model_inst):
+    update_counter.get()
+
+    with solara.Card("État des Robots"):
+        with solara.Column():            
+            # Mission complète ? Utilise ta condition d'arrêt [cite: 82]
+            if model_inst.is_done():
+                solara.Success("Mission accomplie : Zone décontaminée !")
+
+            for i, robot in enumerate(getattr(model_inst, "robots", [])):
+                inv = robot.inventory
+                # On affiche la dernière action pour voir ta policy en direct [cite: 26, 29]
+                action = getattr(robot, "last_action", {})
+                act_name = action.get("type", "Idle") if isinstance(action, dict) else str(action)
+                
+                color = {"green": "green", "yellow": "gold", "red": "red"}.get(robot.robot_type, "gray")
+
+                with solara.Row(style=f"border-left: 5px solid {color}; padding-left: 10px; margin-bottom: 5px;"):
+                    solara.Text(f"Robot {robot.robot_type.upper()} #{i+1}")
+                    solara.Text(f"Position: {robot.pos}")
+                    solara.Text(f"Inventory: {len(inv)} items")
+                    solara.Text(f"Last Action: {act_name}")
+
+# On crée l'instance unique ici
+model1 = RobotMission(width=20, height=10, num_initial_waste=model_params["num_initial_waste"]["value"] , num_green_robots=model_params["num_green_robots"]["value"], num_yellow_robots=model_params["num_yellow_robots"]["value"], num_red_robots=model_params["num_red_robots"]["value"])
+# On lance SolaraViz avec l'INSTANCE
 page = SolaraViz(
-    model1,
-    components=[SpaceGraph, WastePlot],
+    model1, 
+    components=[SpaceGraph, WastePlot, RobotStatusPanel],
     model_params=model_params,
-    name="aSMAtik",
+    name="aSMAtik"
 )
-# This is required to render the visualization in the Jupyter notebook
-page
-# to start : "solara run server.py"
