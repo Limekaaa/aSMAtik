@@ -29,8 +29,8 @@ class RobotMission(Model):
     - num_initial_waste: initial number of green waste pieces
     """
     
-    def __init__(self, width=20, height=10, num_green_robots=2, 
-                 num_yellow_robots=2, num_red_robots=1, num_initial_waste=15):
+    def __init__(self, width=20, height=10, num_green_robots=1, 
+                 num_yellow_robots=1, num_red_robots=1, num_initial_waste=4):
         super().__init__()
         
         self.width = width
@@ -341,6 +341,10 @@ class RobotMission(Model):
         """Execute one step of the simulation."""
         self.schedule.step()
         self.datacollector.collect(self)
+        
+        # Check if mission is complete and stop simulation if so
+        if self.is_done():
+            self.running = False
     
     # Data collection methods
     def _count_green_waste(self):
@@ -367,4 +371,8 @@ class RobotMission(Model):
                 total_disposed += robot.disposed_waste_count
         return total_disposed
 
+    def is_done(self):
+        """Determine if the mission is complete (all waste disposed)."""
+        return self._count_total_waste() == 0 and all(robot.inventory == [] for robot in self.robots)
+    
 

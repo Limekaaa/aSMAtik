@@ -18,6 +18,7 @@ class RobotAgent(Agent):
         self.robot_type = None
         self.max_inventory = 0
         self.disposed_waste_count = 0
+        self.last_action = {}  # Store last action for visualization
         
         # Load policy with available actions
         available_actions = ['move', 'pick_up', 'transform', 'put_down', 'dispose']
@@ -39,7 +40,8 @@ class RobotAgent(Agent):
         self.knowledge["visited"].add(self.pos)
         
         action = self.deliberate(self, self.knowledge)
-        percepts = self.model.do(self, action)
+        self.last_action = action  # Store action for visualization
+        percepts = self.model.do(self, self.last_action)
         self.knowledge.update(percepts)
 
 
