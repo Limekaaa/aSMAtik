@@ -24,8 +24,8 @@ class RobotAgent(Agent):
         # Load policy with available actions
         available_actions = self.model.available_actions
         policy_module = __import__("policies." + policy_name, fromlist="Policy")
-        policy = policy_module.Policy(self.model, available_actions, **kwargs)
-        self.deliberate = policy.deliberate
+        self.policy = policy_module.Policy(self.model, available_actions, **kwargs)
+        self.deliberate = self.policy.deliberate
 
     def update(self, percepts: dict):
         self.knowledge.update(percepts)
@@ -44,6 +44,9 @@ class RobotAgent(Agent):
         percepts = self.model.do(self, action)
         self.knowledge.update(percepts)
 
+    def process_messages(self, messages):
+        """Process received messages and update knowledge."""
+        self.policy.process_messages(self, messages)
 
 class GreenRobot(RobotAgent):
     def __init__(self, model, policy_name: str, **kwargs):

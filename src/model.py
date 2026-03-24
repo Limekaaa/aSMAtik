@@ -37,9 +37,9 @@ class RobotMission(Model):
         
         self.width = width
         self.height = height
-        self.num_green_robots = num_green_robots
-        self.num_yellow_robots = num_yellow_robots
-        self.num_red_robots = num_red_robots
+        self.num_green_robots = ws.tempo_argument.get("n_green", num_green_robots)
+        self.num_yellow_robots = ws.tempo_argument.get("n_yellow", num_yellow_robots)
+        self.num_red_robots = ws.tempo_argument.get("n_red", num_red_robots)
         self.num_initial_waste = num_initial_waste
         self.available_actions = ['move', 'pick_up', 'transform', 'put_down', 'dispose', 'wait', 'read_message', 'send_message']
         self.mailbox = Mailbox()
@@ -213,6 +213,8 @@ class RobotMission(Model):
             self._read_message(agent)
         elif action['type'] == 'send_message':
             self._send_message(agent.unique_id, action.get('recipient_ids', []), action.get('content', None))
+        else:
+            raise ValueError(f"Unknown action type: {action['type']}")
         # Generate and return percepts from new position
         percepts = self._get_percepts(agent)
         return percepts
@@ -304,13 +306,15 @@ class RobotMission(Model):
     def _read_message(self, agent):
         """Read messages for the agent and update knowledge."""
         messages = self.mailbox.read_messages(agent.unique_id)
-        agent.n_unread_messages -= len(messages)
-        return messages
+        agent.process_messages(messages)
+        
     
     def _send_message(self, sender_id, recipient_ids, content):
         """Send a message from one agent to others."""
-        for recipient_id in recipient_ids:
-            self.agents.get(recipient_id).n_unread_messages += 1
+        agents = self.schedule.agents
+        for agent in agents:
+            if agent.unique_id in recipient_ids:
+                agent.n_unread_messages += 1
         self.mailbox.send_message(sender_id, recipient_ids, content)
     
     def _get_percepts(self, agent):
