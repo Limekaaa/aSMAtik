@@ -9,6 +9,7 @@ from mesa.time import RandomActivation
 from mesa.space import MultiGrid
 from mesa.datacollection import DataCollector
 from src.mailbox import Mailbox
+import src.workspace as ws
 
 
 class RobotMission(Model):
@@ -118,13 +119,13 @@ class RobotMission(Model):
         """Initialize robot agents."""
         from .agents import GreenRobot, YellowRobot, RedRobot
 
-        policy_name = 'baseline_policy'
+        policy_name = ws.POLICY
         kwargs = {"holding_threshold": 10}
         
         # Place green robots
         for i in range(self.num_green_robots):
             robot = GreenRobot(self, policy_name, **kwargs)
-            robot.max_inventory = 2
+            robot.max_inventory = ws.GREEN_MAX_INVENTORY
             robot.inventory = []
             robot.disposed_waste_count = 0
             z1_start, z1_end = self.zone_boundaries['z1']
@@ -137,7 +138,7 @@ class RobotMission(Model):
         # Place yellow robots
         for i in range(self.num_yellow_robots):
             robot = YellowRobot(self, policy_name, **kwargs)
-            robot.max_inventory = 2
+            robot.max_inventory = ws.YELLOW_MAX_INVENTORY
             robot.inventory = []
             robot.disposed_waste_count = 0
             z2_start, z2_end = self.zone_boundaries['z2']
@@ -150,7 +151,7 @@ class RobotMission(Model):
         # Place red robots
         for i in range(self.num_red_robots):
             robot = RedRobot(self, policy_name, **kwargs)
-            robot.max_inventory = 1
+            robot.max_inventory = ws.RED_MAX_INVENTORY
             robot.inventory = []
             robot.disposed_waste_count = 0
             z3_start, z3_end = self.zone_boundaries['z3']
