@@ -8,6 +8,7 @@ from mesa import Model, Agent
 from mesa.time import RandomActivation
 from mesa.space import MultiGrid
 from mesa.datacollection import DataCollector
+from src.mailbox import Mailbox
 
 
 class RobotMission(Model):
@@ -39,6 +40,8 @@ class RobotMission(Model):
         self.num_yellow_robots = num_yellow_robots
         self.num_red_robots = num_red_robots
         self.num_initial_waste = num_initial_waste
+        self.available_actions = ['move', 'pick_up', 'transform', 'put_down', 'dispose', 'wait', 'read_message', 'send_message']
+        self.mailbox = Mailbox()
         
         # Zone boundaries (x-coordinates)
         self.zone_boundaries = {
@@ -121,7 +124,6 @@ class RobotMission(Model):
         # Place green robots
         for i in range(self.num_green_robots):
             robot = GreenRobot(self, policy_name, **kwargs)
-            robot.robot_type = 'green'
             robot.max_inventory = 2
             robot.inventory = []
             robot.disposed_waste_count = 0
@@ -135,7 +137,6 @@ class RobotMission(Model):
         # Place yellow robots
         for i in range(self.num_yellow_robots):
             robot = YellowRobot(self, policy_name, **kwargs)
-            robot.robot_type = 'yellow'
             robot.max_inventory = 2
             robot.inventory = []
             robot.disposed_waste_count = 0
@@ -149,7 +150,6 @@ class RobotMission(Model):
         # Place red robots
         for i in range(self.num_red_robots):
             robot = RedRobot(self, policy_name, **kwargs)
-            robot.robot_type = 'red'
             robot.max_inventory = 1
             robot.inventory = []
             robot.disposed_waste_count = 0
@@ -208,7 +208,10 @@ class RobotMission(Model):
             self._execute_dispose(agent)
         elif action['type'] == 'wait':
             pass  # No action needed
-        
+        elif action['type'] == 'read_message':
+            self._read_message(agent)
+        elif action['type'] == 'send_message':
+            self._send_message(agent.unique_id, action.get('recipient_ids', []), action.get('content', None))
         # Generate and return percepts from new position
         percepts = self._get_percepts(agent)
         return percepts
@@ -296,6 +299,18 @@ class RobotMission(Model):
             elif 'green' in agent.inventory:
                 agent.inventory.remove('green')
                 agent.disposed_waste_count += 1
+            
+    def _read_message(self, agent):
+        """Read messages for the agent and update knowledge."""
+        messages = self.mailbox.read_messages(agent.unique_id)
+        agent.n_unread_messages -= len(messages)
+        return messages
+    
+    def _send_message(self, sender_id, recipient_ids, content):
+        """Send a message from one agent to others."""
+        for recipient_id in recipient_ids:
+            self.agents.get(recipient_id).n_unread_messages += 1
+        self.mailbox.send_message(sender_id, recipient_ids, content)
     
     def _get_percepts(self, agent):
         """
@@ -354,9 +369,12 @@ class RobotMission(Model):
         self.schedule.step()
         self.datacollector.collect(self)
         
-        # Check if mission is complete and stop simulation if so
         if self.is_done():
             self.running = False
+
+    def is_done(self):
+        """Determine if the mission is complete (all waste disposed)."""
+        return self._count_total_waste() == 0 and all(robot.inventory == [] for robot in self.robots)
     
     # Data collection methods
     def _count_green_waste(self):

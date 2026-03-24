@@ -17,10 +17,12 @@ class RobotAgent(Agent):
         self.robot_type = None
         self.max_inventory = 0
         self.disposed_waste_count = 0
-        self.last_action = {}  # Store last action for visualization
+        self.last_action = {}
+        self.n_unread_messages = 0
+        self.messages = []
         
         # Load policy with available actions
-        available_actions = ['move', 'pick_up', 'transform', 'put_down', 'dispose']
+        available_actions = self.model.available_actions
         policy_module = __import__("policies." + policy_name, fromlist="Policy")
         policy = policy_module.Policy(self.model, available_actions, **kwargs)
         self.deliberate = policy.deliberate
@@ -38,14 +40,15 @@ class RobotAgent(Agent):
         """Mesa step method."""
         
         action = self.deliberate(self)
-        self.last_action = action  # Store action for visualization
-        percepts = self.model.do(self, self.last_action)
+        self.last_action = action
+        percepts = self.model.do(self, action)
         self.knowledge.update(percepts)
 
 
 class GreenRobot(RobotAgent):
     def __init__(self, model, policy_name: str, **kwargs):
         super().__init__(model, policy_name, **kwargs)
+        self.robot_type = "green"
 
     def can_access_zone(self, zone):
         if zone in ["z1"]:
@@ -61,6 +64,7 @@ class GreenRobot(RobotAgent):
 class YellowRobot(RobotAgent):
     def __init__(self, model, policy_name: str, **kwargs):
         super().__init__(model, policy_name, **kwargs)
+        self.robot_type = "yellow"
 
     def can_access_zone(self, zone):
         if zone in ["z1", "z2"]:
@@ -75,6 +79,7 @@ class YellowRobot(RobotAgent):
 class RedRobot(RobotAgent):
     def __init__(self, model, policy_name: str, **kwargs):
         super().__init__(model, policy_name, **kwargs)
+        self.robot_type = "red"
 
     def can_access_zone(self, zone):
         if zone in ["z1", "z2", "z3"]:
