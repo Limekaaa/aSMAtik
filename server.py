@@ -2,68 +2,94 @@
 # Created 16-03-2026
 # Quentin GUIGNARD, Maxime HANUS, Thomas PEDENAUD
 
-import mesa
 import solara
-from matplotlib.figure import Figure
-from mesa.visualization import SolaraViz, make_plot_component, make_space_component
+from mesa.visualization import SolaraViz, SpaceRenderer, make_plot_component
+from mesa.visualization.components import AgentPortrayalStyle, PropertyLayerStyle
 from mesa.visualization.utils import update_counter
-import matplotlib.pyplot as plt
 
-# Import the local model.py
 from src.model import RobotMission
+from src.agents import GreenRobot, YellowRobot, RedRobot
+from src.objects import WasteAgent, WasteDisposalZoneAgent, RadioactivityAgent
 
 
 def agent_portrayal(agent):
-    portrayal = {}
+    """
+    Draw only meaningful visible agents.
+    Radioactivity is now displayed as a property layer background.
+    """
+
+    # Hide radioactivity agents completely
+    if isinstance(agent, RadioactivityAgent):
+        color = {
+            "z1": "lightgreen",
+            "z2": "lightyellow",
+            "z3": "lightcoral",
+        }.get(agent.zone, "lightgray")
+
+        return AgentPortrayalStyle(
+            color=color,
+            marker="s",
+            size=700,   # grand carré de fond
+            zorder=0,   # tout en dessous
+            alpha=0.5, # léger pour voir les agents dessus
+        )
 
     # Robots
-    if hasattr(agent, "robot_type"):
-        portrayal["marker"] = "o"
-        portrayal["size"] = 50
-        portrayal["alpha"] = 1
+    if isinstance(agent, GreenRobot):
+        return AgentPortrayalStyle(
+            color="green",
+            marker="o",
+            size=100,
+            zorder=3,
+            alpha=1,
+        )
 
-        colors = {
-            "green": "green",
-            "yellow": "gold",
-            "red": "red"
-        }
-        portrayal["color"] = colors[agent.robot_type]
+    if isinstance(agent, YellowRobot):
+        return AgentPortrayalStyle(
+            color="gold",
+            marker="o",
+            size=100,
+            zorder=3,
+            alpha=1,
+        )
+
+    if isinstance(agent, RedRobot):
+        return AgentPortrayalStyle(
+            color="red",
+            marker="o",
+            size=100,
+            zorder=3,
+            alpha=1,
+        )
 
     # Waste
-    elif hasattr(agent, "waste_type"):
-        portrayal["marker"] = "^"
-        portrayal["size"] = 10
-        portrayal["alpha"] = 1
-
-        colors = {
-            "green": "green",
-            "yellow": "gold",
-            "red": "red"
+    if isinstance(agent, WasteAgent):
+        waste_colors = {
+            "green": "#0A8F08",
+            "yellow": "#D4B000",
+            "red": "#CC2222",
         }
-        portrayal["color"] = colors[agent.waste_type]
+        return AgentPortrayalStyle(
+            color=waste_colors.get(agent.waste_type, "gray"),
+            marker="^",
+            size=80,
+            zorder=2,
+            alpha=1,
+        )
 
     # Disposal zone
-    elif agent == agent.model.waste_disposal_zone:
-        portrayal["marker"] = "X"
-        portrayal["size"] = 80
-        portrayal["color"] = "black"
-        portrayal["alpha"] = 1
+    if isinstance(agent, WasteDisposalZoneAgent):
+        return AgentPortrayalStyle(
+            color="black",
+            marker="X",
+            size=200,
+            zorder=2,
+            alpha=1,
+        )
 
-    # Radioactivity
-    elif hasattr(agent, "radioactivity_level"):
+    return AgentPortrayalStyle(color="gray", size=1, alpha=0)
 
-        if agent.zone == "z1":
-            portrayal["color"] = "green"
-        elif agent.zone == "z2":
-            portrayal["color"] = "yellow"
-        else:
-            portrayal["color"] = "red"
 
-        portrayal["marker"] = "s"
-        portrayal["size"] = 300
-        portrayal["alpha"] = 0.2
-
-    return portrayal
 
 
 model_params = {
@@ -93,52 +119,77 @@ model_params = {
     },
     "num_initial_waste": {
         "type": "SliderInt",
-        "value": 1,
+        "value": 4,
         "label": "Number of waste:",
         "min": 0,
         "max": 10,
         "step": 1,
     }
 }
-# Configuration des graphiques Mesa
-SpaceGraph = make_space_component(agent_portrayal)
+
+
 WastePlot = make_plot_component({
     "Green Waste": "#00AA00",
-    "Yellow Waste": "#FFD700", 
+    "Yellow Waste": "#FFD700",
     "Red Waste": "#FF4444",
     "Disposed Waste": "#888888"
 })
+
 
 @solara.component
 def RobotStatusPanel(model_inst):
     update_counter.get()
 
-    with solara.Card("État des Robots"):
-        with solara.Column():            
-            # Mission complète ? Utilise ta condition d'arrêt [cite: 82]
+    with solara.Column(style="display: block; width: 100%; margin-top: 20px; position: relative; z-index: 1;"):
+        with solara.Card("État des Robots"):
             if model_inst.is_done():
                 solara.Success("Mission accomplie : Zone décontaminée !")
 
             for i, robot in enumerate(getattr(model_inst, "robots", [])):
                 inv = robot.inventory
-                # On affiche la dernière action pour voir ta policy en direct [cite: 26, 29]
                 action = getattr(robot, "last_action", {})
                 act_name = action.get("type", "Idle") if isinstance(action, dict) else str(action)
-                
-                color = {"green": "green", "yellow": "gold", "red": "red"}.get(robot.robot_type, "gray")
 
-                with solara.Row(style=f"border-left: 5px solid {color}; padding-left: 10px; margin-bottom: 5px;"):
-                    solara.Text(f"Robot {robot.robot_type.upper()} #{i+1}")
+                color = {
+                    "green": "green",
+                    "yellow": "gold",
+                    "red": "red",
+                }.get(robot.robot_type, "gray")
+
+                with solara.Row(
+                    style=f"border-left: 5px solid {color}; padding-left: 10px; margin-bottom: 5px;"
+                ):
+                    solara.Text(f"Robot {robot.robot_type.upper()} #{i + 1}")
                     solara.Text(f"Position: {robot.pos}")
                     solara.Text(f"Inventory: {len(inv)} items")
                     solara.Text(f"Last Action: {act_name}")
 
-# On crée l'instance unique ici
-model1 = RobotMission(width=20, height=10, num_initial_waste=model_params["num_initial_waste"]["value"] , num_green_robots=model_params["num_green_robots"]["value"], num_yellow_robots=model_params["num_yellow_robots"]["value"], num_red_robots=model_params["num_red_robots"]["value"])
-# On lance SolaraViz avec l'INSTANCE
+
+model1 = RobotMission(
+    width=20,
+    height=10,
+    num_initial_waste=model_params["num_initial_waste"]["value"],
+    num_green_robots=model_params["num_green_robots"]["value"],
+    num_yellow_robots=model_params["num_yellow_robots"]["value"],
+    num_red_robots=model_params["num_red_robots"]["value"],
+)
+
+# Register the property layer on the model
+model1.property_layers = {
+    "radioactivity": model1.radioactivity_map
+}
+
+renderer = SpaceRenderer(model1, backend="matplotlib").render(
+    agent_portrayal=agent_portrayal,
+)
+
 page = SolaraViz(
-    model1, 
-    components=[SpaceGraph, WastePlot, RobotStatusPanel],
+    model1,
+    renderer,
+    components=[
+        WastePlot,
+        RobotStatusPanel, 
+    ],
     model_params=model_params,
-    name="aSMAtik"
+    name="aSMAtik",
 )
