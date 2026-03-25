@@ -70,7 +70,7 @@ class RobotMission(Model):
 
         # Grid
         self.grid = MultiGrid(width, height, torus=False)
-        self.radioactivity_map = np.zeros((self.height, self.width))
+        
         # Custom tracking lists
         self.robots = []
         self.waste_pieces = []
@@ -105,12 +105,7 @@ class RobotMission(Model):
                 zone = self._get_zone(x)
                 radioactivity_level = self._calculate_radioactivity(zone)
 
-                # Fill the property layer
-                self.radioactivity_map[y, x] = radioactivity_level
-
-                # Optional: keep radioactivity agents only if you still need them for logic/debug
-                from .objects import RadioactivityAgent
-                radioactivity = RadioactivityAgent(zone, model=self)
+                radioactivity = RadioactivityAgent(model=self, zone=zone)
                 radioactivity.radioactivity_level = radioactivity_level
                 self.grid.place_agent(radioactivity, (x, y))
                 self.radioactivity_agents.append(radioactivity)

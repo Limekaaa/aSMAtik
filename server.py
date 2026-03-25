@@ -4,7 +4,7 @@
 
 import solara
 from mesa.visualization import SolaraViz, SpaceRenderer, make_plot_component
-from mesa.visualization.components import AgentPortrayalStyle, PropertyLayerStyle
+from mesa.visualization.components import AgentPortrayalStyle
 from mesa.visualization.utils import update_counter
 
 from src.model import RobotMission
@@ -173,11 +173,6 @@ model1 = RobotMission(
     num_yellow_robots=model_params["num_yellow_robots"]["value"],
     num_red_robots=model_params["num_red_robots"]["value"],
 )
-
-# Register the property layer on the model
-model1.property_layers = {
-    "radioactivity": model1.radioactivity_map
-}
 
 renderer = SpaceRenderer(model1, backend="matplotlib").render(
     agent_portrayal=agent_portrayal,
