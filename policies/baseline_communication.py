@@ -35,9 +35,17 @@ class Policy:
             agent.knowledge["holding_steps"] = 0
             agent.knowledge["adjacent_cells"] = {}
             agent.knowledge["everything_visited"] = False
-            agent.knowledge["green_agents_ids"] = [a.unique_id for a in self.model.schedule.agents if a.robot_type == "green"] 
-            agent.knowledge["yellow_agents_ids"] = [a.unique_id for a in self.model.schedule.agents if a.robot_type == "yellow"]
-            agent.knowledge["red_agents_ids"] = [a.unique_id for a in self.model.schedule.agents if a.robot_type == "red"]
+
+            agent.knowledge["green_agents_ids"] = [
+                a.unique_id for a in self.model.robots if a.robot_type == "green"
+            ]
+            agent.knowledge["yellow_agents_ids"] = [
+                a.unique_id for a in self.model.robots if a.robot_type == "yellow"
+            ]
+            agent.knowledge["red_agents_ids"] = [
+                a.unique_id for a in self.model.robots if a.robot_type == "red"
+            ]
+
             self.is_first_step = False
 
 
