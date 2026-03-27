@@ -10,7 +10,7 @@ class Policy:
         self.actions = actions
         self.model = model
 
-    def deliberate(self, knowledge: dict):
+    def deliberate(self, agent):
         """Return an action as a dictionary."""
         action_type = self.model.random.choice(self.actions)
         
