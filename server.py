@@ -122,7 +122,7 @@ model_params = {
         "value": 4,
         "label": "Number of waste:",
         "min": 0,
-        "max": 10,
+        "max": 20,
         "step": 1,
     }
 }
@@ -137,33 +137,81 @@ WastePlot = make_plot_component({
 
 
 @solara.component
-def RobotStatusPanel(model_inst):
+def DashboardPanel(model_inst):
     update_counter.get()
 
-    with solara.Column(style="display: block; width: 100%; margin-top: 20px; position: relative; z-index: 1;"):
-        with solara.Card("État des Robots"):
-            if model_inst.is_done():
-                solara.Success("Mission accomplie : Zone décontaminée !")
+    with solara.Column(style="width: 100%; margin-top: 20px; position: relative; z-index: 1;"):
+        if model_inst.is_done():
+            solara.Success("Mission accomplie : Zone décontaminée !")
 
-            for i, robot in enumerate(getattr(model_inst, "robots", [])):
-                inv = robot.inventory
-                action = getattr(robot, "last_action", {})
-                act_name = action.get("type", "Idle") if isinstance(action, dict) else str(action)
+        with solara.Columns([1, 1]):
+            # Colonne 1 : État des robots
+            with solara.Card("État des Robots"):
+                robots_list = sorted(getattr(model_inst, "robots", []), key=lambda r: getattr(r, 'unique_id', 0))
+                for i, robot in enumerate(robots_list):
+                    inv = robot.inventory
+                    action = getattr(robot, "last_action", {})
+                    act_name = action.get("type", "Idle") if isinstance(action, dict) else str(action)
 
-                color = {
-                    "green": "green",
-                    "yellow": "gold",
-                    "red": "red",
-                }.get(robot.robot_type, "gray")
+                    color = {
+                        "green": "green",
+                        "yellow": "gold",
+                        "red": "red",
+                    }.get(robot.robot_type, "gray")
 
-                with solara.Row(
-                    style=f"border-left: 5px solid {color}; padding-left: 10px; margin-bottom: 5px;"
-                ):
-                    solara.Text(f"Robot {robot.robot_type.upper()} #{i + 1}")
-                    solara.Text(f"Position: {robot.pos}")
-                    solara.Text(f"Inventory: {len(inv)} items")
-                    solara.Text(f"Last Action: {act_name}")
+                    with solara.Row(
+                        style=f"border-left: 5px solid {color}; padding-left: 10px; margin-bottom: 5px;"
+                    ):
+                        solara.Text(f"{robot.robot_type.upper()} (#{getattr(robot, 'unique_id', i + 1)})")
+                        solara.Text(f"Pos: {robot.pos}")
+                        solara.Text(f"Inv: {len(inv)}")
+                        solara.Text(f"Act: {act_name}")
 
+            # Colonne 2 : Messagerie
+            with solara.Card("Messagerie en direct"):
+                mailbox = getattr(model_inst, "mailbox", None)
+                if mailbox is not None:
+                    unread = mailbox._unread_messages
+                    read_msg = mailbox._read_messages
+                    
+                    has_messages = False
+                    robots_list = sorted(getattr(model_inst, "robots", []), key=lambda r: getattr(r, 'unique_id', 0))
+                    for robot in robots_list:
+                        uid = getattr(robot, "unique_id", None)
+                        r_unread = unread.get(uid, [])
+                        r_read = read_msg.get(uid, [])
+                        
+                        if r_unread or r_read:
+                            has_messages = True
+                            color = {"green": "green", "yellow": "gold", "red": "red"}.get(getattr(robot, "robot_type", "gray"), "gray")
+                            with solara.Column(style=f"border-left: 5px solid {color}; padding-left: 10px; margin-bottom: 5px; gap: 0px;"):
+                                solara.Text(f"Destinataire: {getattr(robot, 'robot_type', 'Robot').upper()} (#{uid})", style="font-weight: bold; font-size: 0.9em;")
+                                for m in r_unread:
+                                    solara.Text(f" [Non lu] de #{m['sender_id']}: {m['content']}", style="color: #ff4444; font-size: 0.85em;")
+                                # Afficher les 3 derniers messages lus maximum
+                                for m in r_read[-3:]:
+                                    solara.Text(f" [Lu] de #{m['sender_id']}: {m['content']}", style="color: #888888; font-size: 0.85em;")
+                    
+                    if not has_messages:
+                        solara.Text("Aucun message...")
+                else:
+                    solara.Text("Boîte non trouvée.")
+
+@solara.component
+def MessagesPanel(model_inst):
+    update_counter.get()
+
+    history = model_inst.mailbox.get_history()
+
+    with solara.Card("Messages échangés", style="max-height: 250px; overflow-y: auto;"):
+        if not history:
+            solara.Text("Aucun message envoyé.")
+        else:
+            for msg in reversed(history[-15:]):
+                solara.Text(
+                    f"Msg #{msg['message_id']} | From {msg['sender_id']} "
+                    f"to {msg['recipient_ids']} | {msg['content']}"
+                )
 
 model1 = RobotMission(
     width=20,
@@ -183,7 +231,8 @@ page = SolaraViz(
     renderer,
     components=[
         WastePlot,
-        RobotStatusPanel, 
+        DashboardPanel, 
+        MessagesPanel
     ],
     model_params=model_params,
     name="aSMAtik",

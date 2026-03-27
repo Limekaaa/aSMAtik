@@ -37,13 +37,13 @@ class Policy:
             agent.knowledge["everything_visited"] = False
 
             agent.knowledge["green_agents_ids"] = [
-                a.unique_id for a in self.model.robots if a.robot_type == "green"
+                a.unique_id for a in self.model.robots if a.robot_type == "green" and a.unique_id != agent.unique_id
             ]
             agent.knowledge["yellow_agents_ids"] = [
-                a.unique_id for a in self.model.robots if a.robot_type == "yellow"
+                a.unique_id for a in self.model.robots if a.robot_type == "yellow" and a.unique_id != agent.unique_id
             ]
             agent.knowledge["red_agents_ids"] = [
-                a.unique_id for a in self.model.robots if a.robot_type == "red"
+                a.unique_id for a in self.model.robots if a.robot_type == "red" and a.unique_id != agent.unique_id
             ]
 
             self.is_first_step = False
@@ -94,7 +94,7 @@ class Policy:
                     return {"type": "move", "direction": (dx, dy)}
 
             # Pick green
-            if waste_here(self.model, pos, "green"):
+            if waste_here(self.model, pos, "green") and pos != z1_z2:
                 return {"type": "pick_up"}
             
             # If knows about unpicked green waste, go there
@@ -113,22 +113,29 @@ class Policy:
 
             if not untaken_waste and len(visited) >= z1_size and not knowledge.get("everything_visited", False):
                 agent.knowledge["everything_visited"] = True
+                agent.knowledge["is_sender"] = True
                 return {"type": "send_message", "recipient_ids": agent.knowledge["green_agents_ids"], "content": {"type": "visit_status"}}
 
-            # If has green waste but no known unpicked waste and has visited whole grid, go to checkpoint
-
-
-            if (
-                "green" in inv
-                and not untaken_waste
-                and knowledge.get("everything_visited", False)
-            ):
-                if pos == z1_z2:
-                    return {"type": "put_down"}
+            # If everything visited (received visit_status or explored everything)
+            if knowledge.get("everything_visited", False):
+                if not knowledge.get("is_sender", False):
+                    # For robots receiving the message
+                    if inv:
+                        if pos == z1_z2:
+                            return {"type": "put_down"}
+                        else:
+                            dx = 0 if pos[0] == z1_z2[0] else (1 if z1_z2[0] > pos[0] else -1)
+                            dy = 0 if pos[1] == z1_z2[1] else (1 if z1_z2[1] > pos[1] else -1)
+                            return {"type": "move", "direction": (dx, dy)}
+                    else:
+                        return {"type": "wait"}
                 else:
-                    dx = 0 if pos[0] == z1_z2[0] else (1 if z1_z2[0] > pos[0] else -1)
-                    dy = 0 if pos[1] == z1_z2[1] else (1 if z1_z2[1] > pos[1] else -1)
-                    return {"type": "move", "direction": (dx, dy)}
+                    # For the sender, wait at the checkpoint to collect and transform dropped waste
+                    if pos != z1_z2:
+                        dx = 0 if pos[0] == z1_z2[0] else (1 if z1_z2[0] > pos[0] else -1)
+                        dy = 0 if pos[1] == z1_z2[1] else (1 if z1_z2[1] > pos[1] else -1)
+                        return {"type": "move", "direction": (dx, dy)}
+                    return {"type": "wait"}
 
             # Otherwise explore by prioritizing unvisited neighbors
             neighbors = get_accessible_neighbors(self.model, agent, pos)
@@ -157,7 +164,7 @@ class Policy:
                     return {"type": "move", "direction": (dx, dy)}
 
             # Pick yellow or green
-            if waste_here(self.model, pos, "yellow") or waste_here(self.model, pos, "green"):
+            if (waste_here(self.model, pos, "yellow") or waste_here(self.model, pos, "green")) and pos != z2_z3:
                 return {"type": "pick_up"}
             
             # If holding waste for too long, go to checkpoint to put it down
