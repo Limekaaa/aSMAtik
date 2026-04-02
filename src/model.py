@@ -77,6 +77,9 @@ class RobotMission(Model):
         self.radioactivity_agents = []
         self.waste_disposal_zone = None
 
+        self.directions = [(-1, 0), (1, 0), (0, 1), (0, -1), (0, 0), (-1, 1), (-1, -1), (1, 1), (1, -1)]
+        self.direction_names = ['west', 'east', 'north', 'south', 'self', 'northwest', 'southwest', 'northeast', 'southeast']
+
         # Data collection
         self.datacollector = DataCollector(
             model_reporters={
@@ -128,12 +131,29 @@ class RobotMission(Model):
             self.grid.place_agent(waste, (x, y))
             self.waste_pieces.append(waste)
 
+        if ws.kwargs.get("phase_1", False):
+            z2_start, z2_end = self.zone_boundaries['z2']
+            for _ in range(2): # Just 2 pieces to give Yellow something to do
+                x = random.randint(z2_start, z2_end - 1)
+                y = random.randint(0, self.height - 1)
+                waste = WasteAgent(model=self, waste_type='yellow')
+                self.grid.place_agent(waste, (x, y))
+                self.waste_pieces.append(waste)
+
+            z3_start, z3_end = self.zone_boundaries['z3']
+            for _ in range(2): # Just 2 pieces to give Red something to do
+                x = random.randint(z3_start, z3_end - 1)
+                y = random.randint(0, self.height - 1)
+                waste = WasteAgent(model=self, waste_type='red')
+                self.grid.place_agent(waste, (x, y))
+                self.waste_pieces.append(waste)
+
     def _initialize_agents(self):
         """Initialize robot agents."""
         from .agents import GreenRobot, YellowRobot, RedRobot
 
         policy_name = ws.POLICY
-        kwargs = {"holding_threshold": 10}
+        kwargs = ws.kwargs
 
         # Green robots
         for _ in range(self.num_green_robots):
@@ -325,8 +345,8 @@ class RobotMission(Model):
             'adjacent_cells': {}
         }
 
-        directions = [(-1, 0), (1, 0), (0, -1), (0, 1)]
-        direction_names = ['west', 'east', 'north', 'south']
+        directions = self.directions
+        direction_names = self.direction_names
 
         for direction, name in zip(directions, direction_names):
             dx, dy = direction
