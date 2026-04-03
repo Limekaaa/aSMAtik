@@ -4,11 +4,11 @@ YELLOW_MAX_INVENTORY = 2
 RED_MAX_INVENTORY = 1
 
 base_save_dir = "policies/neural_networks_10_100_300_128_phase1_CNN"
-model_ep = 10000
+model_ep = 4500
 tempo_argument = {}
 
-#kwargs = {"holding_threshold": 10,"phase_1": True, "hidden_dim": 128, "green_nn_path": f"{base_save_dir}/green/green_actor_ep{model_ep}.pth", "yellow_nn_path": f"{base_save_dir}/yellow/yellow_actor_ep{model_ep}.pth", "red_nn_path": f"{base_save_dir}/red/red_actor_ep{model_ep}.pth"}
-kwargs = {"holding_threshold": 10, "hidden_dim": 128, "phase_1": True}
+kwargs = {"holding_threshold": 10,"phase_1": True, "hidden_dim": 128, "green_nn_path": f"{base_save_dir}/green/green_actor_ep{model_ep}.pth", "yellow_nn_path": f"{base_save_dir}/yellow/yellow_actor_ep{model_ep}.pth", "red_nn_path": f"{base_save_dir}/red/red_actor_ep{model_ep}.pth"}
+#kwargs = {"holding_threshold": 10, "hidden_dim": 128, "phase_1": True}
 
 green_yellow_rl_actions = [
                            {'type': 'move', 'direction': (0, 1)},

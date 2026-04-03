@@ -168,10 +168,16 @@ class RLEnvironmentWrapper:
         def manhattan_dist(p1, p2):
             return abs(p1[0] - p2[0]) + abs(p1[1] - p2[1])
 
+        def y_axis_dist(p1, p2):
+            return abs(p1[1] - p2[1])
+        
+        used_dist_func = manhattan_dist # Change to y_axis_dist if you want to prioritize vertical proximity
+
         # 1. Evaluate waste currently on the grid
         for waste in self.mesa_model.waste_pieces:
             c_g = self.omega_class.get(waste.waste_type, 0.0)
-            d_g = manhattan_dist(waste.pos, collector_pos)
+            #d_g = manhattan_dist(waste.pos, collector_pos)
+            d_g = used_dist_func(waste.pos, collector_pos)
             # ADD the inverted distance so closeness = higher positive score
             phi += (c_g + self.omega_dist * (max_dist - d_g))
 
@@ -179,7 +185,7 @@ class RLEnvironmentWrapper:
         for agent in self.mesa_model.robots:
             for item_type in agent.inventory:
                 c_g = self.omega_class.get(item_type, 0.0)
-                d_g = manhattan_dist(agent.pos, collector_pos)
+                d_g = used_dist_func(agent.pos, collector_pos)
                 phi += (c_g + self.omega_dist * (max_dist - d_g))
 
         return phi

@@ -21,8 +21,11 @@ PPO_EPOCHS = 4
 UPDATE_EVERY_EPISODES = 4
 MAX_EPISODES = 10001
 MAX_STEPS_PER_EPISODE = 400
+START_EPISODE = 3000
 
 SAVE_INTERVAL = 500
+
+phase_starts = [0, 3000, 6000]
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -61,6 +64,18 @@ def train_mappo():
         'yellow': GlobalCritic(env.mesa_model, grid_width=env.mesa_model.width, grid_height=env.mesa_model.height).to(device),
         'red': GlobalCritic(env.mesa_model, grid_width=env.mesa_model.width, grid_height=env.mesa_model.height).to(device)
     }
+
+    # --- NEW: Load Checkpoints if Resuming ---
+    if START_EPISODE > 0:
+        print(f"Resuming training from Episode {START_EPISODE}...")
+        for color in ['green', 'yellow', 'red']:
+            actor_path = os.path.join(ws.base_save_dir, color, f"{color}_actor_ep{START_EPISODE}.pth")
+            if os.path.exists(actor_path):
+                master_actors[color].load_state_dict(torch.load(actor_path, map_location=device))
+                print(f"  -> Successfully loaded {color} actor from {actor_path}")
+            else:
+                print(f"  -> WARNING: Could not find checkpoint at {actor_path}")
+    # -----------------------------------------
     
     # 4. Setup Optimizers
     actor_optimizers = {
@@ -75,7 +90,21 @@ def train_mappo():
     master_batch = {color: {'states': [], 'actions': [], 'log_probs': [], 'hxs': [], 'cxs': [], 'returns': [], 'advantages': [], 'grids': [], 'coords': [], 'masks': []} for color in ['green', 'yellow', 'red']}
     
     # --- Main Training Loop ---
-    for episode in range(MAX_EPISODES):
+    for episode in range(START_EPISODE, MAX_EPISODES):
+        
+        # --- Phase selector ---
+        curr_phase = 0
+
+        for i in range(len(phase_starts)):
+            if episode >= phase_starts[i]:
+                curr_phase = i+1
+
+        for k in list(ws.kwargs.keys()):
+            if "phase" in k:
+                if int(k.split("_")[-1]) == curr_phase:
+                    ws.kwargs[k] = True
+                else:
+                    ws.kwargs[k] = False
         
         # --- RANDOMIZE ENVIRONMENT ---
         n_green = random.randint(1, 4)
@@ -188,7 +217,7 @@ def train_mappo():
                 master_batch[color]['grids'].extend(buf['global_grids'])
                 master_batch[color]['coords'].extend(buf['global_coords'])
 
-        if episode == 0:
+        if episode == START_EPISODE:
             avg_aloss = np.nan
             avg_closs = np.nan
             avg_ent = np.nan

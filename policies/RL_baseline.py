@@ -319,7 +319,7 @@ class RLPolicies(nn.Module):
                 dx, dy = action['direction']
                 if 0 <= x + dx <= max_x and 0 <= y + dy <= max_y: mask[i] = 1.0
             elif a_type == 'pick_up':
-                if any(hasattr(obj, 'waste_type') for obj in current_cell_contents): mask[i] = 1.0
+                if any(hasattr(obj, 'waste_type') for obj in current_cell_contents) and len(agent.inventory) < agent.max_inventory: mask[i] = 1.0
             elif a_type == 'put_down':
                 if len(agent.inventory) > 0: mask[i] = 1.0
             elif a_type == 'transform':

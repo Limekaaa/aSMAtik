@@ -140,6 +140,26 @@ class RobotMission(Model):
                 self.grid.place_agent(waste, (x, y))
                 self.waste_pieces.append(waste)
 
+
+        if ws.kwargs.get("phase_1", False):
+            # Spawn Yellow waste specifically on the Z1/Z2 frontier
+            # Using the start of z2 as the exact border line
+            border_x_z1_z2 = self.zone_boundaries['z2'][0] -1
+            for _ in range(2): 
+                y = random.randint(0, self.height - 1)
+                waste = WasteAgent(model=self, waste_type='yellow')
+                self.grid.place_agent(waste, (border_x_z1_z2, y))
+                self.waste_pieces.append(waste)
+
+            # Spawn Red waste specifically on the Z2/Z3 frontier
+            # Using the start of z3 as the exact border line
+            border_x_z2_z3 = self.zone_boundaries['z3'][0] -1
+            for _ in range(2): 
+                y = random.randint(0, self.height - 1)
+                waste = WasteAgent(model=self, waste_type='red')
+                self.grid.place_agent(waste, (border_x_z2_z3, y))
+                self.waste_pieces.append(waste)
+
             z3_start, z3_end = self.zone_boundaries['z3']
             for _ in range(2): # Just 2 pieces to give Red something to do
                 x = random.randint(z3_start, z3_end - 1)
