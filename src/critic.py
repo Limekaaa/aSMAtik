@@ -6,7 +6,7 @@ class GlobalCritic(nn.Module):
     Centralized Critic for MAPPO. 
     Evaluates the Global State to compute the baseline V(s).
     """
-    def __init__(self, grid_width=20, grid_height=10, hidden_dim=128):
+    def __init__(self, model, grid_width=20, grid_height=10, hidden_dim=128):
         super(GlobalCritic, self).__init__()
         
         self.width = grid_width
@@ -32,9 +32,11 @@ class GlobalCritic(nn.Module):
         self.cnn_flat_dim = 32 * cnn_output_height * cnn_output_width
         
         # --- 2. The Coordinates Extractor (MLP) ---
-        # Processes the (x, y) coordinates of the garbage collector
+        # Processes the (x, y) coordinates of the garbage collector and the inventory of the agents
+        n_agents = len(model.robots)
+        self.mlp_input_dim = 2 + n_agents * 3 
         self.coords_mlp = nn.Sequential(
-            nn.Linear(2, 16),
+            nn.Linear(self.mlp_input_dim, 16),
             nn.ReLU()
         )
         
@@ -102,20 +104,29 @@ class GlobalCritic(nn.Module):
                 
         # 3. Extract and Normalize Collector Coordinates
         # Normalizing coordinates between [0, 1] prevents massive gradients in the MLP
+        global_vector = []
         if model.waste_disposal_zone is not None:
             c_x, c_y = model.waste_disposal_zone.pos
             normalized_x = c_x / max(1, self.width - 1)
             normalized_y = c_y / max(1, self.height - 1)
-            collector_coords = torch.tensor([normalized_x, normalized_y], dtype=torch.float32)
+            global_vector.extend([normalized_x, normalized_y])
         else:
-            collector_coords = torch.zeros(2, dtype=torch.float32)
+            global_vector.extend([0.0, 0.0])
+
+        # NEW: Append every agent's inventory counts to the 1D vector
+        for robot in model.robots:
+            global_vector.append(robot.inventory.count("green"))
+            global_vector.append(robot.inventory.count("yellow"))
+            global_vector.append(robot.inventory.count("red"))
             
-        return grid_state, collector_coords
+        global_vector_tensor = torch.tensor(global_vector, dtype=torch.float32)
+            
+        return grid_state, global_vector_tensor
 
     def evaluate(self, model):
         """
         Helper method to instantly evaluate the environment's current value.
         """
-        grid_state, collector_coords = self.extract_global_state(model)
-        value = self.forward(grid_state, collector_coords)
+        grid_state, global_vector = self.extract_global_state(model)
+        value = self.forward(grid_state, global_vector)
         return value.item()

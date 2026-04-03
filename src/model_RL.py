@@ -9,16 +9,16 @@ class RLEnvironmentWrapper:
     """
     def __init__(self, **kwargs):
         # Hyperparameters for the Reward Function
-        self.gamma = 0.99
-        self.lambda_deposit = 100.0
-        self.lambda_time = 0.1
+        self.gamma = 1.0
+        self.lambda_deposit = 400.0
+        self.lambda_time = 0.0
         self.omega_dist = 1.0
         
         # Critical Math Constraint: V(Yellow) > 2 * V(Green), V(Red) > 2 * V(Yellow)
         self.omega_class = {
             'green': 10.0,
-            'yellow': 100.0,  # 25 > 2 * 10
-            'red': 300.0      # 60 > 2 * 25
+            'yellow': 50, #100.0,  # 25 > 2 * 10
+            'red': 130 #300.0      # 60 > 2 * 25
         }
         
         self.beta_handoff = 5.0
@@ -57,7 +57,7 @@ class RLEnvironmentWrapper:
         
         # 3. Calculate Rewards
         raw_rewards = self._calculate_rewards(old_inventories)
-        rewards = {aid: (reward / 100.0) for aid, reward in raw_rewards.items()}
+        rewards = {aid: (reward / 1) for aid, reward in raw_rewards.items()}
         
         # 4. Check terminal state
         dones = {agent.unique_id: self.mesa_model.is_done() for agent in self.mesa_model.robots}
@@ -115,22 +115,24 @@ class RLEnvironmentWrapper:
             # 1. Communication Penalty
             if a_type == 'send_message':
                 rewards[agent.unique_id] -= self.lambda_comm
+            
+
+            # # DROP 2 AND 3 IF REWARD HACKING BECOMES AN ISSUE
+            # # 2. Track Drops for Handoffs 
+            # elif a_type == 'put_down':
+            #     # Record that this agent dropped something at this exact coordinate
+            #     self.drop_tracker[agent.pos] = agent.unique_id
                 
-            # 2. Track Drops for Handoffs
-            elif a_type == 'put_down':
-                # Record that this agent dropped something at this exact coordinate
-                self.drop_tracker[agent.pos] = agent.unique_id
-                
-            # 3. Reward Handoffs on Pickups
-            elif a_type == 'pick_up':
-                if agent.pos in self.drop_tracker:
-                    dropper_id = self.drop_tracker[agent.pos]
-                    # If picked up by a DIFFERENT agent, grant the bonus to the dropper
-                    if dropper_id != agent.unique_id:
-                        if dropper_id in rewards:
-                            rewards[dropper_id] += self.beta_handoff
-                    # Clear the tracker for this tile since the item was picked up
-                    del self.drop_tracker[agent.pos]
+            # # 3. Reward Handoffs on Pickups
+            # elif a_type == 'pick_up':
+            #     if agent.pos in self.drop_tracker:
+            #         dropper_id = self.drop_tracker[agent.pos]
+            #         # If picked up by a DIFFERENT agent, grant the bonus to the dropper
+            #         if dropper_id != agent.unique_id:
+            #             if dropper_id in rewards:
+            #                 rewards[dropper_id] += self.beta_handoff
+            #         # Clear the tracker for this tile since the item was picked up
+            #         del self.drop_tracker[agent.pos]
 
             # 4. Reward Transformations (Crafting)
             elif a_type == 'transform':

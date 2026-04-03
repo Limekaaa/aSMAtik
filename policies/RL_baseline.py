@@ -350,6 +350,8 @@ class RLPolicies(nn.Module):
         agent.knowledge['last_hx'] = agent.knowledge['hx'].detach()
         agent.knowledge['last_cx'] = agent.knowledge['cx'].detach()
 
+        agent.knowledge['last_mask'] = dynamic_mask.detach()
+
         logits, new_hx, new_cx = self.forward(
             x_input, 
             agent.knowledge['hx'], 
@@ -360,7 +362,7 @@ class RLPolicies(nn.Module):
         agent.knowledge['hx'] = new_hx.detach()
         agent.knowledge['cx'] = new_cx.detach()
 
-        dynamic_mask = torch.zeros_like(dynamic_mask).to(device) # no masking in case of error.
+        #dynamic_mask = torch.zeros_like(dynamic_mask).to(device) # no masking in case of error.
         chosen_action, action_idx, log_prob = self.logits_to_action(logits, dynamic_mask)
 
         agent.knowledge['last_action_idx'] = action_idx
