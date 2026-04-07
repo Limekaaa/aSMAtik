@@ -19,13 +19,14 @@ CLIP_RATIO = 0.2
 ENTROPY_COEF = 0.01
 PPO_EPOCHS = 4
 UPDATE_EVERY_EPISODES = 4
-MAX_EPISODES = 10001
+MAX_EPISODES = 40001
 MAX_STEPS_PER_EPISODE = 400
-START_EPISODE = 3000
+START_EPISODE = 0
+ACTOR_FREEZE_EPISODES = 0  # <-- ADD THIS: Number of episodes to freeze the actor
 
-SAVE_INTERVAL = 500
+SAVE_INTERVAL = 250
 
-phase_starts = [0, 3000, 6000]
+phase_starts = [0, 2000, 12500, 22500, 32500]
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -87,24 +88,35 @@ def train_mappo():
     
     mse_loss = nn.MSELoss()
 
-    master_batch = {color: {'states': [], 'actions': [], 'log_probs': [], 'hxs': [], 'cxs': [], 'returns': [], 'advantages': [], 'grids': [], 'coords': [], 'masks': []} for color in ['green', 'yellow', 'red']}
+    if 'noLSTM' in ws.POLICY:
+        master_batch = {color: {'states': [], 'actions': [], 'log_probs': [], 'returns': [], 'advantages': [], 'grids': [], 'coords': [], 'masks': []} for color in ['green', 'yellow', 'red']}
+    else:
+        master_batch = {color: {'states': [], 'actions': [], 'log_probs': [], 'hxs': [], 'cxs': [], 'returns': [], 'advantages': [], 'grids': [], 'coords': [], 'masks': []} for color in ['green', 'yellow', 'red']}
     
     # --- Main Training Loop ---
     for episode in range(START_EPISODE, MAX_EPISODES):
-        
+
         # --- Phase selector ---
-        curr_phase = 0
+        base_phase = 1
 
         for i in range(len(phase_starts)):
             if episode >= phase_starts[i]:
-                curr_phase = i+1
+                base_phase = i + 1
 
-        for k in list(ws.kwargs.keys()):
-            if "phase" in k:
-                if int(k.split("_")[-1]) == curr_phase:
-                    ws.kwargs[k] = True
-                else:
-                    ws.kwargs[k] = False
+        # --- NEW: Curriculum Interleaving (Rehearsal) ---
+        curr_phase = base_phase
+        if base_phase > 1:
+            # How deep are we into the current phase?
+            episodes_into_phase = episode - phase_starts[base_phase - 1]
+            
+            # During the first 1000 episodes of a new phase, 
+            # there is a 30% chance to load the previous phase instead!
+            if episodes_into_phase < 1500:
+                if random.random() < 0.30:
+                    curr_phase = base_phase - 1
+                    
+        ws.kwargs['phase'] = curr_phase
+        # ------------------------------------------------
         
         # --- RANDOMIZE ENVIRONMENT ---
         n_green = random.randint(1, 4)
@@ -130,11 +142,18 @@ def train_mappo():
 
         # Buffers for trajectories, structured by agent ID
         # Added global_grids and global_coords to train the Critic
-        buffers = {agent.unique_id: {
-            'states': [], 'actions': [], 'log_probs': [], 'rewards': [], 
-            'values': [], 'dones': [], 'hxs': [], 'cxs': [],
-            'global_grids': [], 'global_coords': [], 'masks': []
-        } for agent in env.mesa_model.robots}
+        if 'noLSTM' in ws.POLICY:
+            buffers = {agent.unique_id: {
+                'states': [], 'actions': [], 'log_probs': [], 'rewards': [], 
+                'values': [], 'dones': [], 
+                'global_grids': [], 'global_coords': [], 'masks': []
+            } for agent in env.mesa_model.robots}
+        else:
+            buffers = {agent.unique_id: {
+                'states': [], 'actions': [], 'log_probs': [], 'rewards': [], 
+                'values': [], 'dones': [], 'hxs': [], 'cxs': [],
+                'global_grids': [], 'global_coords': [], 'masks': []
+            } for agent in env.mesa_model.robots}
         
         agent_colors = {agent.unique_id: agent.robot_type for agent in env.mesa_model.robots}
         
@@ -169,8 +188,9 @@ def train_mappo():
                 
                 if 'last_action_idx' in k:
                     buffers[aid]['states'].append(k['last_x_input'].clone())
-                    buffers[aid]['hxs'].append(k['last_hx'].clone())
-                    buffers[aid]['cxs'].append(k['last_cx'].clone())
+                    if not 'noLSTM' in ws.POLICY:
+                        buffers[aid]['hxs'].append(k['last_hx'].clone())
+                        buffers[aid]['cxs'].append(k['last_cx'].clone())
                     buffers[aid]['masks'].append(k['last_mask'].clone())
                     buffers[aid]['actions'].append(k['last_action_idx'])
                     buffers[aid]['log_probs'].append(k['last_action_log_prob'])
@@ -209,8 +229,9 @@ def train_mappo():
                 master_batch[color]['states'].extend(buf['states'])
                 master_batch[color]['actions'].extend(buf['actions'])
                 master_batch[color]['log_probs'].extend(buf['log_probs'])
-                master_batch[color]['hxs'].extend(buf['hxs'])
-                master_batch[color]['cxs'].extend(buf['cxs'])
+                if not 'noLSTM' in ws.POLICY:
+                    master_batch[color]['hxs'].extend(buf['hxs'])
+                    master_batch[color]['cxs'].extend(buf['cxs'])
                 master_batch[color]['masks'].extend(buf['masks'])
                 master_batch[color]['returns'].extend(ret)
                 master_batch[color]['advantages'].extend(adv)
@@ -221,6 +242,9 @@ def train_mappo():
             avg_aloss = np.nan
             avg_closs = np.nan
             avg_ent = np.nan
+
+        freeze_actor = (START_EPISODE > 0) and (episode < START_EPISODE + ACTOR_FREEZE_EPISODES)
+
         # --- PPO Update Phase (Every N Episodes) ---
         if (episode + 1) % UPDATE_EVERY_EPISODES == 0:
             ep_actor_losses, ep_critic_losses, ep_entropies = [], [], []
@@ -231,8 +255,9 @@ def train_mappo():
                 
                 # Convert the accumulated Master Batch to tensors
                 states = torch.stack(mb['states']).to(device)
-                hxs = torch.cat(mb['hxs']).to(device) 
-                cxs = torch.cat(mb['cxs']).to(device)
+                if not 'noLSTM' in ws.POLICY:
+                    hxs = torch.cat(mb['hxs']).to(device) 
+                    cxs = torch.cat(mb['cxs']).to(device)
                 batch_masks = torch.stack(mb['masks']).to(device)
                 actions = torch.tensor(mb['actions'], dtype=torch.long).to(device)
                 old_log_probs = torch.tensor(mb['log_probs'], dtype=torch.float32).to(device)
@@ -252,7 +277,10 @@ def train_mappo():
 
                 for _ in range(PPO_EPOCHS):
                     # 1. Actor Update
-                    logits, _, _ = actor(states, hxs, cxs)
+                    if not 'noLSTM' in ws.POLICY:
+                        logits, _, _ = actor(states, hxs, cxs)
+                    else:
+                        logits = actor(states)
 
                     ### Mask handling
                     penalty = (1.0 - batch_masks) * -1e9
@@ -275,10 +303,11 @@ def train_mappo():
                     surr2 = torch.clamp(ratios, 1.0 - CLIP_RATIO, 1.0 + CLIP_RATIO) * advantages
                     actor_loss = -torch.min(surr1, surr2).mean() - ENTROPY_COEF * entropy
 
-                    actor_optim.zero_grad()
-                    actor_loss.backward()
-                    nn.utils.clip_grad_norm_(actor.parameters(), max_norm=0.5)
-                    actor_optim.step()
+                    if not freeze_actor:
+                        actor_optim.zero_grad()
+                        actor_loss.backward()
+                        nn.utils.clip_grad_norm_(actor.parameters(), max_norm=0.5)
+                        actor_optim.step()
 
                     # 2. Critic Update 
                     current_values = critic(batch_grids, batch_coords).squeeze()
@@ -301,7 +330,10 @@ def train_mappo():
                 ep_entropies.append(color_ent / PPO_EPOCHS)
 
             # --- NEW: Clear the Master Batch after the update is complete ---
-            master_batch = {color: {'states': [], 'actions': [], 'log_probs': [], 'hxs': [], 'cxs': [], 'returns': [], 'advantages': [], 'grids': [], 'coords': [], 'masks': []} for color in ['green', 'yellow', 'red']}
+            if 'noLSTM' in ws.POLICY:
+                master_batch = {color: {'states': [], 'actions': [], 'log_probs': [], 'returns': [], 'advantages': [], 'grids': [], 'coords': [], 'masks': []} for color in ['green', 'yellow', 'red']}
+            else:
+                master_batch = {color: {'states': [], 'actions': [], 'log_probs': [], 'hxs': [], 'cxs': [], 'returns': [], 'advantages': [], 'grids': [], 'coords': [], 'masks': []} for color in ['green', 'yellow', 'red']}
 
             # Update the averages ONLY on update episodes
             avg_aloss = np.mean(ep_actor_losses) if ep_actor_losses else 0.0
@@ -321,7 +353,7 @@ def train_mappo():
         # --- Logging and Saving ---
         if episode % 5 == 0:
             
-            print(f"=== Episode {episode} ===")
+            print(f"=== Episode {episode}, phase {ws.kwargs['phase']} ===")
             print(f"Config   : {n_green} Green | {n_yellow} Yellow | {n_red} Red | {n_waste} Initial Waste")
             print(f"Progress : Waste Left: {env.mesa_model._count_total_waste()} | Disposed: {env.mesa_model._count_disposed_waste()}")
             print(f"Metrics  : Total Reward: {episode_reward:.2f}")

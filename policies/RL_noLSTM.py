@@ -19,43 +19,42 @@ class RLPolicies(nn.Module):
         self.grid_w = model.grid.width
         self.grid_h = model.grid.height
 
-        # Sizing boundaries
-        self.spatial_flat_size = 8 * self.grid_w * self.grid_h
+        # --- FRAME STACKING CONFIG ---
+        self.n_frames = 4  
+        self.spatial_flat_size = (9 * self.n_frames) * self.grid_w * self.grid_h
         self.inv_size = 3 # count of each waste type in inventory
         self.msg_size = 5 * self.n_possible_messages
         
         output_dim = len(self.available_actions)
         self.hidden_dim = kwargs.get("hidden_dim", 64)
 
-        # input_dim = 5* self.n_possible_messages + 4 + 9*4 # spatial features + message features
-        # # 1. Feature Extractor
-        # self.embedding = nn.Sequential(
-        #     nn.Linear(input_dim, self.hidden_dim),
-        #     nn.ReLU(),
-        #     nn.Linear(self.hidden_dim, self.hidden_dim),
-        #     nn.ReLU()
-        # )
-
-        # 1. Spatial Vision (CNN)
+        # 1. Spatial Vision (CNN) - Upgraded Capacity for Frame Stacking
         self.cnn = nn.Sequential(
-            nn.Conv2d(in_channels=8, out_channels=16, kernel_size=3, padding=1),
+            # Layer 1: Expand 36 channels to 64 feature maps (removes the bottleneck)
+            nn.Conv2d(in_channels=9 * self.n_frames, out_channels=64, kernel_size=3, padding=1),
             nn.ReLU(),
-            nn.Conv2d(in_channels=16, out_channels=32, kernel_size=3, padding=1),
+            
+            # Layer 2: Deepen feature extraction
+            nn.Conv2d(in_channels=64, out_channels=128, kernel_size=3, padding=1),
             nn.ReLU(),
-            nn.AdaptiveMaxPool2d((3, 3)), # Compresses any grid size down to 3x3 for stability
+            
+            # Layer 3: Advanced spatial/temporal pattern recognition
+            nn.Conv2d(in_channels=128, out_channels=128, kernel_size=3, padding=1),
+            nn.ReLU(),
+            
+            # Compress spatial dimensions down to 3x3 for stability before the MLP
+            nn.AdaptiveMaxPool2d((3, 3)), 
             nn.Flatten()
         )
 
-        cnn_output_dim = 32 * 3 * 3 # 288
+        # Output dimension is now 128 channels * 3 * 3 = 1152
+        cnn_output_dim = 128 * 3 * 3
         
         combined_dim = cnn_output_dim + self.inv_size + self.msg_size
         self.feature_mlp = nn.Sequential(
             nn.Linear(combined_dim, self.hidden_dim),
             nn.ReLU()
         )
-
-        # 2. LSTM Memory Cell (Processes exactly one step at a time)
-        self.lstm = nn.LSTMCell(input_size=self.hidden_dim, hidden_size=self.hidden_dim)
 
         # 3. Actor Head (Outputs raw logits, NOT probabilities)
         self.actor_head = nn.Linear(self.hidden_dim, output_dim)
@@ -76,36 +75,29 @@ class RLPolicies(nn.Module):
                 print("Try loading on CPU...")
                 self.load_state_dict(torch.load(nn_path, map_location=torch.device('cpu')))    
             
-    def forward(self, x, hx, cx):
-        if x.dim() == 1:
-            x = x.unsqueeze(0)
+    def forward(self, x):
+            if x.dim() == 1:
+                x = x.unsqueeze(0)
+                
+            # 1. Unpack the single tensor
+            spatial_flat = x[:, :self.spatial_flat_size]
+            other_features = x[:, self.spatial_flat_size:]
             
-        # 1. Unpack the single tensor
-        spatial_flat = x[:, :self.spatial_flat_size]
-        other_features = x[:, self.spatial_flat_size:]
-        
-        # 2. Reshape spatial back into 2D Image: (Batch, Channels, W, H)
-        spatial_img = spatial_flat.view(-1, 8, self.grid_w, self.grid_h)
-        
-        # 3. Run CNN
-        cnn_features = self.cnn(spatial_img)
-        
-        # 4. Recombine and run MLP
-        combined_features = torch.cat([cnn_features, other_features], dim=1)
-        emb = self.feature_mlp(combined_features)
-        
-        # 5. LSTM & Actor
-        hx, cx = self.lstm(emb, (hx, cx))
-        logits = self.actor_head(hx)
-        
-        return logits, hx, cx
-    """
-    def logits_to_action(self, logits):
-        action = torch.multinomial(logits, num_samples=1)
-        chosen_action = action.item()
+            # 2. Reshape spatial back into 2D Image: (Batch, Channels, W, H)
+            spatial_img = spatial_flat.view(-1, 9 * self.n_frames, self.grid_w, self.grid_h)
+            
+            # 3. Run CNN
+            cnn_features = self.cnn(spatial_img)
+            
+            # 4. Recombine and run MLP
+            combined_features = torch.cat([cnn_features, other_features], dim=1)
+            emb = self.feature_mlp(combined_features)
+            
+            # 5. Actor
+            logits = self.actor_head(emb)
+            
+            return logits
 
-        return self.available_actions[chosen_action]
-    """
     def logits_to_action(self, logits, dynamic_mask=None):
         # Categorical handles raw logits perfectly for PPO
         penalty = (1.0 - dynamic_mask) * -1e9
@@ -158,90 +150,24 @@ class RLPolicies(nn.Module):
 
         device = next(self.parameters()).device
 
-        agent.knowledge['hx'] = torch.zeros(1, self.hidden_dim)
-        agent.knowledge['cx'] = torch.zeros(1, self.hidden_dim)
-
-    # def _knowledge_to_input(self, agent):
-    #     # This function can be used to convert the agent's knowledge into a tensor input for the policy network.
-    #     adjacent_cells = agent.knowledge.get("adjacent_cells", {})
-    #     message_vect = torch.zeros(5*self.n_possible_messages) # coord x sender, coord y sender, n_green_items sender, n_yellow_items sender, n_red_items sender
-    #     spatial_vect = torch.zeros((4+9*4)) # coord x, coord y, n_green_items, n_yellow_items, 9 features per adjacent cells (4)
-
-    #     # Spatial features _______________________________________________________________
-    #     spatial_vect[:2] = torch.tensor(agent.pos)
-    #     spatial_vect[2] = agent.inventory.count("green")
-    #     spatial_vect[3] = agent.inventory.count("yellow")
-
-    #     percepts = agent.knowledge.get('adjacent_cells', {})
-    #     directions = self.model.direction_names
-
+        # Initialize the pheromone map
+        agent.knowledge['visit_counts'] = torch.zeros((self.grid_w, self.grid_h))
         
-
-    #     if percepts != {}:
-    #         for direction, cell in zip(percepts.keys(), percepts.values()):
-    #             dir_idx = directions.index(direction)
-    #             spatial_vect[4+dir_idx*9] = cell['waste'].count("green")
-    #             spatial_vect[4+dir_idx*9+1] = cell['waste'].count("yellow")
-    #             spatial_vect[4+dir_idx*9+2] = cell['waste'].count("red")
-    #             spatial_vect[4+dir_idx*9+3] = cell['robots'].count("green")
-    #             spatial_vect[4+dir_idx*9+4] = cell['robots'].count("yellow")
-    #             spatial_vect[4+dir_idx*9+5] = cell['robots'].count("red")
-    #             spatial_vect[4+dir_idx*9+6] = 1 if cell['zone'] == 'z1' else 0
-    #             spatial_vect[4+dir_idx*9+7] = 1 if cell['zone'] == 'z2' else 0
-    #             spatial_vect[4+dir_idx*9+8] = 1 if cell['zone'] == 'z3' else 0
-
-    #     # Message features _______________________________________________________________
-    #     if percepts.get('messages', {}) != {}:
-    #         for i in range(self.n_possible_messages):
-    #             message_vect[i*5:i*5+5] = agent.knowledge['messages'].get(i, torch.zeros(5))
-        
-    #     device = next(self.parameters()).device
-
-    #     # Mask Generation ________________________________________________________________
-        
-    #     mask = torch.zeros(len(self.available_actions))
-    #     x, y = agent.pos
-    #     max_x, max_y = self.model.grid.width - 1, self.model.grid.height - 1
-        
-    #     for i, action in enumerate(self.available_actions):
-    #         a_type = action['type']
-            
-    #         if a_type == 'move':
-    #             dx, dy = action['direction']
-    #             if 0 <= x + dx <= max_x and 0 <= y + dy <= max_y:
-    #                 mask[i] = 1.0
-                    
-    #         elif a_type == 'pick_up':
-    #             cell_contents = self.model.grid.get_cell_list_contents([agent.pos])
-    #             if any(hasattr(obj, 'waste_type') for obj in cell_contents):
-    #                 mask[i] = 1.0
-                    
-    #         elif a_type == 'put_down':
-    #             if len(agent.inventory) > 0:
-    #                 mask[i] = 1.0
-                    
-    #         elif a_type == 'transform':
-    #             if agent.robot_type == 'green' and agent.inventory.count('green') >= 2:
-    #                 mask[i] = 1.0
-    #             elif agent.robot_type == 'yellow' and (agent.inventory.count('green') >= 2 or agent.inventory.count('yellow') >= 2):
-    #                 mask[i] = 1.0
-                    
-    #         elif a_type == 'dispose':
-    #             # Safely check if agent is on the collector zone
-    #             if hasattr(self.model, 'waste_disposal_zone') and agent.pos == self.model.waste_disposal_zone.pos and len(agent.inventory) > 0:
-    #                 mask[i] = 1.0          
-    #         else:
-    #             # wait, send_message, read_message are always physically legal
-    #             mask[i] = 1.0
-
-    #     return torch.cat([spatial_vect, message_vect]).to(device), mask.to(device)
+        # Initialize the rolling frame buffer (4 blank frames)
+        agent.knowledge['frame_stack'] = [
+            torch.zeros((9, self.grid_w, self.grid_h)) for _ in range(self.n_frames)
+        ]
 
     def _knowledge_to_input(self, agent):
-        # 1. Initialize empty global map (8 channels)
-        spatial_img = torch.zeros((8, self.grid_w, self.grid_h))
+        # 1. Initialize empty global map (9 channels)
+        spatial_img = torch.zeros((9, self.grid_w, self.grid_h))
         
         x, y = agent.pos
         spatial_img[0, x, y] = 1.0 # Channel 0: Self Pos
+
+        agent.knowledge['visit_counts'] *= 0.95
+        agent.knowledge['visit_counts'][x, y] += 1.0
+        spatial_img[8, :, :] = agent.knowledge['visit_counts']
         
         # Helper function to paint a cell onto the image channels
         def paint_cell(cx, cy, cell_info, is_self=False):
@@ -310,10 +236,16 @@ class RLPolicies(nn.Module):
             for i in range(self.n_possible_messages):
                 message_vect[i*5:i*5+5] = agent.knowledge['messages'].get(i, torch.zeros(5))
 
+        agent.knowledge['frame_stack'].pop(0)
+        agent.knowledge['frame_stack'].append(spatial_img.clone())
+        
+        # Concatenate the 4 frames along the channel dimension -> Shape: (36, W, H)
+        stacked_img = torch.cat(agent.knowledge['frame_stack'], dim=0)
+
         # Flatten and combine
         device = next(self.parameters()).device
-        combined_input = torch.cat([spatial_img.flatten(), inv_vect, message_vect]).to(device)
-
+        combined_input = torch.cat([stacked_img.flatten(), inv_vect, message_vect]).to(device)
+        
         # 4. Action Mask
         mask = torch.zeros(len(self.available_actions))
         max_x, max_y = self.grid_w - 1, self.grid_h - 1
@@ -362,7 +294,7 @@ class RLPolicies(nn.Module):
 
     
     def deliberate(self, agent):
-        if 'hx' not in agent.knowledge:
+        if 'visit_counts' not in agent.knowledge:
             self._init_knowledge(agent)
             self.is_first_step = False
 
@@ -370,26 +302,16 @@ class RLPolicies(nn.Module):
         x_input, dynamic_mask = self._knowledge_to_input(agent)
         device = next(self.parameters()).device
         x_input = x_input.to(device)
-        agent.knowledge['hx'] = agent.knowledge['hx'].to(device)
-        agent.knowledge['cx'] = agent.knowledge['cx'].to(device)
 
         # SAVE THE TENSORS FOR THE TRAINING SCRIPT BEFORE UPDATING THEM
         agent.knowledge['last_x_input'] = x_input.detach()
-        agent.knowledge['last_hx'] = agent.knowledge['hx'].detach()
-        agent.knowledge['last_cx'] = agent.knowledge['cx'].detach()
 
         agent.knowledge['last_mask'] = dynamic_mask.detach()
 
-        logits, new_hx, new_cx = self.forward(
-            x_input, 
-            agent.knowledge['hx'], 
-            agent.knowledge['cx']
+        logits = self.forward(
+            x_input
         )
-        # CRITICAL FIX: Overwrite the knowledge with DETACHED hidden states
-        # This severs the memory leak between steps.
-        agent.knowledge['hx'] = new_hx.detach()
-        agent.knowledge['cx'] = new_cx.detach()
-
+        
         #dynamic_mask = torch.zeros_like(dynamic_mask).to(device) # no masking in case of error.
         chosen_action, action_idx, log_prob = self.logits_to_action(logits, dynamic_mask)
 

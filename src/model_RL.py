@@ -57,7 +57,7 @@ class RLEnvironmentWrapper:
         
         # 3. Calculate Rewards
         raw_rewards = self._calculate_rewards(old_inventories)
-        rewards = {aid: (reward / 1) for aid, reward in raw_rewards.items()}
+        rewards = {aid: (reward / 100.0) for aid, reward in raw_rewards.items()}
         
         # 4. Check terminal state
         dones = {agent.unique_id: self.mesa_model.is_done() for agent in self.mesa_model.robots}
@@ -187,5 +187,45 @@ class RLEnvironmentWrapper:
                 c_g = self.omega_class.get(item_type, 0.0)
                 d_g = used_dist_func(agent.pos, collector_pos)
                 phi += (c_g + self.omega_dist * (max_dist - d_g))
+
+        # 3. The "Hot & Cold" Radar (Hierarchical & Exploit-Proof)
+        for agent in self.mesa_model.robots:
+            
+            # Define priority weights for each agent type
+            target_weights = {}
+            if agent.robot_type == 'green':
+                target_weights = {'green': 1.0}
+            elif agent.robot_type == 'yellow':
+                target_weights = {'yellow': 1.0, 'green': 0.5}
+            elif agent.robot_type == 'red':
+                target_weights = {'red': 1.0, 'yellow': 0.6, 'green': 0.3}
+                
+            radar_max_score = 0.5 * max_dist
+            
+            # A. Evaluate items already in the backpack using their specific weights.
+            # This ensures holding a Red waste gives Red more potential than holding Green.
+            for item in agent.inventory:
+                weight = target_weights.get(item, 0.0)
+                phi += weight * radar_max_score
+            
+            # B. If the agent still has space, calculate the best weighted score on the floor
+            if len(agent.inventory) < getattr(agent, 'max_inventory', 2):
+                valid_wastes = [w for w in self.mesa_model.waste_pieces if w.waste_type in target_weights]
+                
+                if valid_wastes:
+                    best_seek_score = 0.0
+                    for w in valid_wastes:
+                        dist = used_dist_func(agent.pos, w.pos)
+                        weight = target_weights[w.waste_type]
+                        # Calculate the score for this specific piece of waste
+                        score = weight * 0.5 * (max_dist - dist)
+                        
+                        if score > best_seek_score:
+                            best_seek_score = score
+                            
+                    phi += best_seek_score
+                else:
+                    # If nothing valid is on the floor, give the absolute max to prevent bleeding
+                    phi += radar_max_score
 
         return phi
