@@ -117,7 +117,7 @@ class RobotMission(Model):
 
         # Place waste disposal zone (random cell in z3)
         z3_start, z3_end = self.zone_boundaries['z3']
-        if current_phase == 1:
+        if current_phase <= 2:
             disposal_x = z3_end - 1
             disposal_y = self.height // 2
         else:
@@ -181,6 +181,21 @@ class RobotMission(Model):
 
         elif current_phase == 3:
             # PHASE 3: "The Fade-Out"
+            # Garbage collector is now mobile but waste is still fixed on the borders
+            for _ in range(5): 
+                y = random.randint(0, self.height - 1)
+                waste = WasteAgent(model=self, waste_type='yellow')
+                self.grid.place_agent(waste, (border_x_z1_z2, y))
+                self.waste_pieces.append(waste)
+
+            for _ in range(5): 
+                y = random.randint(0, self.height - 1)
+                waste = WasteAgent(model=self, waste_type='red')
+                self.grid.place_agent(waste, (border_x_z2_z3, y))
+                self.waste_pieces.append(waste)
+
+        elif current_phase == 4:
+            # PHASE 4: "The Fade-Out"
             # Random amount (0 to 4), slightly drifting away from the exact borders
             num_yellow = random.randint(0, 4)
             for _ in range(num_yellow):
@@ -449,7 +464,8 @@ class RobotMission(Model):
         for robot in self.robots:
             robot.step()
 
-        self.datacollector.collect(self)
+        if not "RL" in ws.POLICY and  not ws.train:
+            self.datacollector.collect(self)
 
         if self.is_done():
             self.running = False

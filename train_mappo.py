@@ -4,6 +4,7 @@ from torch.optim import Adam
 import numpy as np
 import random
 import os
+import pandas as pd
 
 # Import your custom modules
 from src.model_RL import RLEnvironmentWrapper
@@ -19,14 +20,14 @@ CLIP_RATIO = 0.2
 ENTROPY_COEF = 0.01
 PPO_EPOCHS = 4
 UPDATE_EVERY_EPISODES = 4
-MAX_EPISODES = 40001
+MAX_EPISODES = 690001
 MAX_STEPS_PER_EPISODE = 400
-START_EPISODE = 0
+START_EPISODE = -1
 ACTOR_FREEZE_EPISODES = 0  # <-- ADD THIS: Number of episodes to freeze the actor
 
-SAVE_INTERVAL = 250
+SAVE_INTERVAL = 1000
 
-phase_starts = [0, 2000, 12500, 22500, 32500]
+phase_starts = [0, 4000, 14000, 29000, 49000]
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -46,7 +47,7 @@ def compute_gae(rewards, values, dones, next_value, gamma, lam):
 
 def train_mappo():
     print(f"Starting MAPPO Training on {device}...")
-    
+    global START_EPISODE
     # 1. Initialize Environment with baseline params to extract Master Networks
     env = RLEnvironmentWrapper(num_green_robots=1, num_yellow_robots=1, num_red_robots=1)
     env.reset()
@@ -67,15 +68,40 @@ def train_mappo():
     }
 
     # --- NEW: Load Checkpoints if Resuming ---
-    if START_EPISODE > 0:
+    if START_EPISODE == -1:
+        logs = pd.read_csv('training_log.csv')
+        START_EPISODE = logs['Episode'].max() if not logs.empty else 0
+        
         print(f"Resuming training from Episode {START_EPISODE}...")
         for color in ['green', 'yellow', 'red']:
-            actor_path = os.path.join(ws.base_save_dir, color, f"{color}_actor_ep{START_EPISODE}.pth")
+            actor_path = os.path.join(ws.base_save_dir, color, f"{color}_actor_last.pth")
+            critic_path = os.path.join(ws.base_save_dir, color, f"{color}_critic_last.pth")
             if os.path.exists(actor_path):
                 master_actors[color].load_state_dict(torch.load(actor_path, map_location=device))
                 print(f"  -> Successfully loaded {color} actor from {actor_path}")
             else:
                 print(f"  -> WARNING: Could not find checkpoint at {actor_path}")
+            if os.path.exists(critic_path):
+                critics[color].load_state_dict(torch.load(critic_path, map_location=device))
+                print(f"  -> Successfully loaded {color} critic from {critic_path}")
+            else:
+                print(f"  -> WARNING: Could not find checkpoint at {critic_path}")
+  
+    elif START_EPISODE > 0:
+        print(f"Resuming training from Episode {START_EPISODE}...")
+        for color in ['green', 'yellow', 'red']:
+            actor_path = os.path.join(ws.base_save_dir, color, f"{color}_actor_ep{START_EPISODE}.pth")
+            critic_path = os.path.join(ws.base_save_dir, color, f"{color}_critic_ep{START_EPISODE}.pth")
+            if os.path.exists(actor_path):
+                master_actors[color].load_state_dict(torch.load(actor_path, map_location=device))
+                print(f"  -> Successfully loaded {color} actor from {actor_path}")
+            else:
+                print(f"  -> WARNING: Could not find checkpoint at {actor_path}")
+            if os.path.exists(critic_path):
+                critics[color].load_state_dict(torch.load(critic_path, map_location=device))
+                print(f"  -> Successfully loaded {color} critic from {critic_path}")
+            else:
+                print(f"  -> WARNING: Could not find checkpoint at {critic_path}")
     # -----------------------------------------
     
     # 4. Setup Optimizers
@@ -358,7 +384,7 @@ def train_mappo():
             print(f"Progress : Waste Left: {env.mesa_model._count_total_waste()} | Disposed: {env.mesa_model._count_disposed_waste()}")
             print(f"Metrics  : Total Reward: {episode_reward:.2f}")
             print(f"Losses   : Actor: {avg_aloss:.4f} | Critic: {avg_closs:.4f} | Entropy: {avg_ent:.4f}\n")
-            
+
         if episode % SAVE_INTERVAL == 0:
             if not os.path.exists(ws.base_save_dir):
                 os.makedirs(ws.base_save_dir)
@@ -369,6 +395,22 @@ def train_mappo():
             torch.save(master_actors['green'].state_dict(), os.path.join(ws.base_save_dir, "green", f"green_actor_ep{episode}.pth"))
             torch.save(master_actors['yellow'].state_dict(), os.path.join(ws.base_save_dir, "yellow", f"yellow_actor_ep{episode}.pth"))
             torch.save(master_actors['red'].state_dict(), os.path.join(ws.base_save_dir, "red", f"red_actor_ep{episode}.pth"))
+
+            torch.save(critics['green'].state_dict(), os.path.join(ws.base_save_dir, "green", f"green_critic_ep{episode}.pth"))
+            torch.save(critics['yellow'].state_dict(), os.path.join(ws.base_save_dir, "yellow", f"yellow_critic_ep{episode}.pth"))
+            torch.save(critics['red'].state_dict(), os.path.join(ws.base_save_dir, "red", f"red_critic_ep{episode}.pth"))
+
+        try:
+            torch.save(master_actors['green'].state_dict(), os.path.join(ws.base_save_dir, "green", f"green_actor_last.pth"))
+            torch.save(master_actors['yellow'].state_dict(), os.path.join(ws.base_save_dir, "yellow", f"yellow_actor_last.pth"))
+            torch.save(master_actors['red'].state_dict(), os.path.join(ws.base_save_dir, "red", f"red_actor_last.pth"))
+
+            torch.save(critics['green'].state_dict(), os.path.join(ws.base_save_dir, "green", f"green_critic_last.pth"))
+            torch.save(critics['yellow'].state_dict(), os.path.join(ws.base_save_dir, "yellow", f"yellow_critic_last.pth"))
+            torch.save(critics['red'].state_dict(), os.path.join(ws.base_save_dir, "red", f"red_critic_last.pth"))
+        except Exception as e:
+            print(f"Error saving checkpoint {episode}: {e}")
+        
 
 if __name__ == "__main__":
     train_mappo()

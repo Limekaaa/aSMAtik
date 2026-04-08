@@ -1,14 +1,20 @@
-POLICY = "RL_noLSTM"
+POLICY = "RL_baseline"
 GREEN_MAX_INVENTORY = 2
 YELLOW_MAX_INVENTORY = 2
 RED_MAX_INVENTORY = 1
 
-base_save_dir = "policies/neural_networks_10_100_300_128_4_phases_CNN_hotncold_noLSTM"
-model_ep = 5000
+base_save_dir = "policies/neural_networks_10_100_300_128_5_phases_CNN_hotncold"
+model_ep = 'last'
 tempo_argument = {}
+train = True
 
-#kwargs = {"holding_threshold": 10,"phase": 1, "hidden_dim": 128, "deterministic": True,"green_nn_path": f"{base_save_dir}/green/green_actor_ep{model_ep}.pth", "yellow_nn_path": f"{base_save_dir}/yellow/yellow_actor_ep{model_ep}.pth", "red_nn_path": f"{base_save_dir}/red/red_actor_ep{model_ep}.pth"}
-kwargs = {"holding_threshold": 10, "hidden_dim": 128, "phase":1}
+if not train:
+    if model_ep == 'last':
+        kwargs = {"holding_threshold": 10,"phase": 1, "hidden_dim": 128, "deterministic": False,"green_nn_path": f"{base_save_dir}/green/green_actor_{model_ep}.pth", "yellow_nn_path": f"{base_save_dir}/yellow/yellow_actor_{model_ep}.pth", "red_nn_path": f"{base_save_dir}/red/red_actor_{model_ep}.pth"}
+    else:
+        kwargs = {"holding_threshold": 10,"phase": 1, "hidden_dim": 128, "deterministic": True,"green_nn_path": f"{base_save_dir}/green/green_actor_ep{model_ep}.pth", "yellow_nn_path": f"{base_save_dir}/yellow/yellow_actor_ep{model_ep}.pth", "red_nn_path": f"{base_save_dir}/red/red_actor_ep{model_ep}.pth"}
+else:
+    kwargs = {"holding_threshold": 10, "hidden_dim": 128, "phase":1}
 
 green_yellow_rl_actions = [
                            {'type': 'move', 'direction': (0, 1)},
