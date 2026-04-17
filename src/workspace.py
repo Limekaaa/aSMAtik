@@ -1,13 +1,15 @@
-POLICY = "RL_baseline_only_greens"
+POLICY = "RL_baseline_RL_train"
 GREEN_MAX_INVENTORY = 2
 YELLOW_MAX_INVENTORY = 2
 RED_MAX_INVENTORY = 1
 
-base_save_dir = "policies/neural_networks_only_greens"
-model_ep = 'last'
+base_save_dir = "policies/neural_networks_10_100_300_128_5_phases_CNN_hotncold"
+model_ep = 'last'  # Can be 'last' or an integer episode number (e.g., 1000)
 tempo_argument = {}
-train = True
+train = False
 communication_allowed = False
+
+
 dummy_kwargs = {'num_green_robots': 1, 'num_yellow_robots': 1, 'num_red_robots': 1, 'num_initial_waste': 5}
 
 yellow_rl_temperature = 1.0
@@ -18,7 +20,7 @@ if not train:
     if model_ep == 'last':
         kwargs = {"holding_threshold": 10,"phase": 5, "hidden_dim": 128, "deterministic": False,"green_nn_path": f"{base_save_dir}/green/green_actor_{model_ep}.pth", "yellow_nn_path": f"{base_save_dir}/yellow/yellow_actor_{model_ep}.pth", "red_nn_path": f"{base_save_dir}/red/red_actor_{model_ep}.pth"}
     else:
-        kwargs = {"holding_threshold": 10,"phase": 2, "hidden_dim": 128, "deterministic": False,"green_nn_path": f"{base_save_dir}/green/green_actor_ep{model_ep}.pth", "yellow_nn_path": f"{base_save_dir}/yellow/yellow_actor_ep{model_ep}.pth", "red_nn_path": f"{base_save_dir}/red/red_actor_ep{model_ep}.pth"}
+        kwargs = {"holding_threshold": 10,"phase": 5, "hidden_dim": 128, "deterministic": False,"green_nn_path": f"{base_save_dir}/green/green_actor_ep{model_ep}.pth", "yellow_nn_path": f"{base_save_dir}/yellow/yellow_actor_ep{model_ep}.pth", "red_nn_path": f"{base_save_dir}/red/red_actor_ep{model_ep}.pth"}
 else:
     kwargs = {"holding_threshold": 10, "hidden_dim": 128, "phase":5}
 
