@@ -1,8 +1,11 @@
 from run_simulation import main
 import argparse
 import os 
-
+import src.workspace as ws
 if __name__ == "__main__":
+
+    ws.train = False
+
         # Parse arguments
     parser = argparse.ArgumentParser(
         description="Execute robot mission simulations with custom parameters and policies",
@@ -106,11 +109,17 @@ Examples:
     
     args = parser.parse_args()
     n_sim = args.batch_size
+    os.makedirs(args.output, exist_ok=True)
+
 
     for i in range(n_sim):
         args = parser.parse_args()
+
         print(f"Running simulation {i+1}/{args.batch_size} with seed {i}")
-        args["output"] = os.path.join(args.output, f"simulation_{i+1}")
+        args_dict = vars(args)
+        args_dict["output"] = os.path.join(args.output, f"simulation_{i+1}.csv")
+        args_dict["seed"] = i  # Set a different seed for each simulation
+        args = argparse.Namespace(**args_dict)
         main(args)
 
     args = parser.parse_args()
