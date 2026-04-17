@@ -77,6 +77,9 @@ class RobotMission(Model):
         self.radioactivity_agents = []
         self.waste_disposal_zone = None
 
+        self.directions = [(-1, 0), (1, 0), (0, 1), (0, -1), (0, 0), (-1, 1), (-1, -1), (1, 1), (1, -1)]
+        self.direction_names = ['west', 'east', 'north', 'south', 'self', 'northwest', 'southwest', 'northeast', 'southeast']
+
         # Data collection
         self.datacollector = DataCollector(
             model_reporters={
@@ -99,6 +102,8 @@ class RobotMission(Model):
 
         from .objects import RadioactivityAgent, WasteDisposalZoneAgent, WasteAgent
 
+        current_phase = ws.kwargs.get("phase", 0)
+
         # Create radioactivity agents for each zone (one per cell)
         for x in range(self.width):
             for y in range(self.height):
@@ -112,12 +117,17 @@ class RobotMission(Model):
 
         # Place waste disposal zone (random cell in z3)
         z3_start, z3_end = self.zone_boundaries['z3']
-        disposal_x = random.randint(z3_start, z3_end - 1)
-        disposal_y = random.randint(0, self.height - 1)
+        if current_phase <= 2:
+            disposal_x = z3_end - 1
+            disposal_y = self.height // 2
+        else:
+            disposal_x = random.randint(z3_start, z3_end - 1)
+            disposal_y = random.randint(0, self.height - 1)
+
 
         self.waste_disposal_zone = WasteDisposalZoneAgent(model=self)
         self.grid.place_agent(self.waste_disposal_zone, (disposal_x, disposal_y))
-
+        
         # Create initial green waste in z1
         z1_start, z1_end = self.zone_boundaries['z1']
         for _ in range(self.num_initial_waste):
@@ -128,12 +138,90 @@ class RobotMission(Model):
             self.grid.place_agent(waste, (x, y))
             self.waste_pieces.append(waste)
 
+        border_x_z1_z2 = self.zone_boundaries['z2'][0] - 1
+        border_x_z2_z3 = self.zone_boundaries['z3'][0] - 1
+
+        if current_phase == 1:
+            center_y = self.height // 2
+            for _ in range(5): 
+                y = random.randint(0, self.height - 1)
+                waste = WasteAgent(model=self, waste_type='yellow')
+                self.grid.place_agent(waste, (border_x_z1_z2, y))
+                self.waste_pieces.append(waste)
+
+            for _ in range(3): 
+                #y = random.randint(0, self.height - 1)
+                waste = WasteAgent(model=self, waste_type='red')
+                self.grid.place_agent(waste, (border_x_z2_z3, center_y))
+                self.waste_pieces.append(waste)
+
+             
+            waste = WasteAgent(model=self, waste_type='red')
+            self.grid.place_agent(waste, (disposal_x-2, disposal_y))
+            self.waste_pieces.append(waste)
+
+            waste = WasteAgent(model=self, waste_type='red')
+            self.grid.place_agent(waste, (disposal_x, disposal_y)) # Will drop on the collector
+            self.waste_pieces.append(waste)
+
+        elif current_phase == 2:
+            # PHASE 2: "Training Wheels" 
+            # Fixed amounts, strictly glued to the borders
+            for _ in range(5): 
+                y = random.randint(0, self.height - 1)
+                waste = WasteAgent(model=self, waste_type='yellow')
+                self.grid.place_agent(waste, (border_x_z1_z2, y))
+                self.waste_pieces.append(waste)
+
+            for _ in range(5): 
+                y = random.randint(0, self.height - 1)
+                waste = WasteAgent(model=self, waste_type='red')
+                self.grid.place_agent(waste, (border_x_z2_z3, y))
+                self.waste_pieces.append(waste)
+
+        elif current_phase == 3:
+            # PHASE 3: "The Fade-Out"
+            # Garbage collector is now mobile but waste is still fixed on the borders
+            for _ in range(5): 
+                y = random.randint(0, self.height - 1)
+                waste = WasteAgent(model=self, waste_type='yellow')
+                self.grid.place_agent(waste, (border_x_z1_z2, y))
+                self.waste_pieces.append(waste)
+
+            for _ in range(5): 
+                y = random.randint(0, self.height - 1)
+                waste = WasteAgent(model=self, waste_type='red')
+                self.grid.place_agent(waste, (border_x_z2_z3, y))
+                self.waste_pieces.append(waste)
+
+        elif current_phase == 4:
+            # PHASE 4: "The Fade-Out"
+            # Random amount (0 to 4), slightly drifting away from the exact borders
+            num_yellow = random.randint(0, 4)
+            for _ in range(num_yellow):
+                # Drift -1 to +1 from the Z1/Z2 border
+                drift_x = max(0, min(self.width - 1, border_x_z1_z2 + random.randint(-1, 1)))
+                y = random.randint(0, self.height - 1)
+                waste = WasteAgent(model=self, waste_type='yellow')
+                self.grid.place_agent(waste, (drift_x, y))
+                self.waste_pieces.append(waste)
+
+            num_red = random.randint(0, 4)
+            for _ in range(num_red):
+                # Drift -1 to +1 from the Z2/Z3 border
+                drift_x = max(0, min(self.width - 1, border_x_z2_z3 + random.randint(-1, 1)))
+                y = random.randint(0, self.height - 1)
+                waste = WasteAgent(model=self, waste_type='red')
+                self.grid.place_agent(waste, (drift_x, y))
+                self.waste_pieces.append(waste)
+
+
     def _initialize_agents(self):
         """Initialize robot agents."""
         from .agents import GreenRobot, YellowRobot, RedRobot
 
         policy_name = ws.POLICY
-        kwargs = {"holding_threshold": 10}
+        kwargs = ws.kwargs
 
         # Green robots
         for _ in range(self.num_green_robots):
@@ -157,8 +245,13 @@ class RobotMission(Model):
             robot.disposed_waste_count = 0
 
             z2_start, z2_end = self.zone_boundaries['z2']
-            x = random.randint(z2_start, z2_end - 1)
-            y = random.randint(0, self.height - 1)
+
+            if ws.kwargs.get("phase", 0) == 1:
+                x = z2_start 
+                y = self.height // 2
+            else:
+                x = random.randint(z2_start, z2_end - 1)
+                y = random.randint(0, self.height - 1)
 
             self.grid.place_agent(robot, (x, y))
             self.robots.append(robot)
@@ -171,8 +264,14 @@ class RobotMission(Model):
             robot.disposed_waste_count = 0
 
             z3_start, z3_end = self.zone_boundaries['z3']
-            x = random.randint(z3_start, z3_end - 1)
-            y = random.randint(0, self.height - 1)
+            if ws.kwargs.get("phase", 0) == 1:
+                disposal_x = z3_end - 1
+                disposal_y = self.height // 2
+                x = disposal_x - 1
+                y = disposal_y
+            else:
+                x = random.randint(z3_start, z3_end - 1)
+                y = random.randint(0, self.height - 1)
 
             self.grid.place_agent(robot, (x, y))
             self.robots.append(robot)
@@ -325,8 +424,8 @@ class RobotMission(Model):
             'adjacent_cells': {}
         }
 
-        directions = [(-1, 0), (1, 0), (0, -1), (0, 1)]
-        direction_names = ['west', 'east', 'north', 'south']
+        directions = self.directions
+        direction_names = self.direction_names
 
         for direction, name in zip(directions, direction_names):
             dx, dy = direction
@@ -365,7 +464,8 @@ class RobotMission(Model):
         for robot in self.robots:
             robot.step()
 
-        self.datacollector.collect(self)
+        if not ws.train:
+            self.datacollector.collect(self)
 
         if self.is_done():
             self.running = False

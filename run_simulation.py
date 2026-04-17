@@ -8,102 +8,7 @@ import src.workspace as ws
 from src.model import RobotMission
 
 
-def main():
-    # Parse arguments
-    parser = argparse.ArgumentParser(
-        description="Execute robot mission simulations with custom parameters and policies",
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="""
-Examples:
-  # Run with baseline policy, default parameters
-  python run_simulation.py --policy baseline_policy
-  
-  # Run with random policy, custom grid and robots
-  python run_simulation.py --policy random_policy --width 30 --height 15 --green-robots 3 --yellow-robots 2 --red-robots 1
-  
-  # Run with communication policy, custom waste and steps
-  python run_simulation.py --policy communication_v2 --initial-waste 25 --steps 500
-  
-  # Run with baseline communication and save with custom name
-  python run_simulation.py --policy baseline_communication --output my_simulation.csv --seed 42
-        """
-    )
-    
-    # Policy selection
-    parser.add_argument(
-        '--policy',
-        type=str,
-        default='baseline_policy',
-        choices=['baseline_policy', 'random_policy', 'baseline_communication', 'communication_v2'],
-        help='Policy to use for robot behavior (default: baseline_policy)'
-    )
-    
-    # Model parameters
-    parser.add_argument(
-        '--width',
-        type=int,
-        default=20,
-        help='Grid width (default: 20)'
-    )
-    parser.add_argument(
-        '--height',
-        type=int,
-        default=10,
-        help='Grid height (default: 10)'
-    )
-    parser.add_argument(
-        '--green-robots',
-        type=int,
-        default=2,
-        help='Number of green robots (default: 2)'
-    )
-    parser.add_argument(
-        '--yellow-robots',
-        type=int,
-        default=2,
-        help='Number of yellow robots (default: 2)'
-    )
-    parser.add_argument(
-        '--red-robots',
-        type=int,
-        default=1,
-        help='Number of red robots (default: 1)'
-    )
-    parser.add_argument(
-        '--initial-waste',
-        type=int,
-        default=15,
-        help='Initial number of waste pieces (default: 15)'
-    )
-    
-    # Simulation parameters
-    parser.add_argument(
-        '--steps',
-        type=int,
-        default=200,
-        help='Number of simulation steps (default: 200)'
-    )
-    parser.add_argument(
-        '--seed',
-        type=int,
-        default=None,
-        help='Random seed for reproducibility (default: None)'
-    )
-    
-    # Output parameters
-    parser.add_argument(
-        '--output',
-        type=str,
-        default='simulation_data.csv',
-        help='Output CSV file name (default: simulation_data.csv)'
-    )
-    parser.add_argument(
-        '--verbose',
-        action='store_true',
-        help='Print step-by-step information during simulation'
-    )
-    
-    args = parser.parse_args()
+def main(args=None):
     
     # Display configuration
     print("=" * 70)
@@ -190,4 +95,99 @@ Examples:
 
 
 if __name__ == "__main__":
-    main()
+    # Parse arguments
+    parser = argparse.ArgumentParser(
+        description="Execute robot mission simulations with custom parameters and policies",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+        Examples:
+        # Run with baseline policy, default parameters
+        python run_simulation.py --policy baseline_policy
+        
+        # Run with random policy, custom grid and robots
+        python run_simulation.py --policy random_policy --width 30 --height 15 --green-robots 3 --yellow-robots 2 --red-robots 1
+        
+        # Run with communication policy, custom waste and steps
+        python run_simulation.py --policy communication_v2 --initial-waste 25 --steps 500
+        
+        # Run with baseline communication and save with custom name
+        python run_simulation.py --policy baseline_communication --output my_simulation.csv --seed 42
+        """
+    )
+    
+    # Policy selection
+    parser.add_argument(
+        '--policy',
+        type=str,
+        default='baseline_policy',
+        choices=['baseline_policy', 'random_policy', 'baseline_communication', 'communication_v2', 'RL_baseline_RL_train'],
+        help='Policy to use for robot behavior (default: baseline_policy)'
+    )
+    
+    # Model parameters
+    parser.add_argument(
+        '--width',
+        type=int,
+        default=20,
+        help='Grid width (default: 20)'
+    )
+    parser.add_argument(
+        '--height',
+        type=int,
+        default=10,
+        help='Grid height (default: 10)'
+    )
+    parser.add_argument(
+        '--green-robots',
+        type=int,
+        default=2,
+        help='Number of green robots (default: 2)'
+    )
+    parser.add_argument(
+        '--yellow-robots',
+        type=int,
+        default=2,
+        help='Number of yellow robots (default: 2)'
+    )
+    parser.add_argument(
+        '--red-robots',
+        type=int,
+        default=1,
+        help='Number of red robots (default: 1)'
+    )
+    parser.add_argument(
+        '--initial-waste',
+        type=int,
+        default=15,
+        help='Initial number of waste pieces (default: 15)'
+    )
+    
+    # Simulation parameters
+    parser.add_argument(
+        '--steps',
+        type=int,
+        default=200,
+        help='Number of simulation steps (default: 200)'
+    )
+    parser.add_argument(
+        '--seed',
+        type=int,
+        default=None,
+        help='Random seed for reproducibility (default: None)'
+    )
+    
+    # Output parameters
+    parser.add_argument(
+        '--output',
+        type=str,
+        default='simulation_data.csv',
+        help='Output CSV file name (default: simulation_data.csv)'
+    )
+    parser.add_argument(
+        '--verbose',
+        action='store_true',
+        help='Print step-by-step information during simulation'
+    )
+    
+    args = parser.parse_args()
+    main(args)
