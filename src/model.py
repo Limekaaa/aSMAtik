@@ -146,7 +146,7 @@ class RobotMission(Model):
             for _ in range(5): 
                 y = random.randint(0, self.height - 1)
                 waste = WasteAgent(model=self, waste_type='yellow')
-                self.grid.place_agent(waste, (border_x_z1_z2, center_y))
+                self.grid.place_agent(waste, (border_x_z1_z2, y))
                 self.waste_pieces.append(waste)
 
             for _ in range(3): 
@@ -247,7 +247,7 @@ class RobotMission(Model):
             z2_start, z2_end = self.zone_boundaries['z2']
 
             if ws.kwargs.get("phase", 0) == 1:
-                x = z2_end - 3
+                x = z2_start 
                 y = self.height // 2
             else:
                 x = random.randint(z2_start, z2_end - 1)
@@ -464,7 +464,7 @@ class RobotMission(Model):
         for robot in self.robots:
             robot.step()
 
-        if not "RL" in ws.POLICY and  not ws.train:
+        if not ws.train:
             self.datacollector.collect(self)
 
         if self.is_done():

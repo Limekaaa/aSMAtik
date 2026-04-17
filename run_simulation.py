@@ -34,7 +34,7 @@ Examples:
         '--policy',
         type=str,
         default='baseline_policy',
-        choices=['baseline_policy', 'random_policy', 'baseline_communication', 'communication_v2'],
+        choices=['baseline_policy', 'random_policy', 'baseline_communication', 'communication_v2', 'RL_baseline_RL_train'],
         help='Policy to use for robot behavior (default: baseline_policy)'
     )
     
